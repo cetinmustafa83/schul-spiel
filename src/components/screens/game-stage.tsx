@@ -128,10 +128,47 @@ export function GameStageScreen() {
         return;
       }
       setReveal(data.reveal);
+
+      // Browser-side persistence (LokiJS): update XP, seen, review deck, topic mastery, history
+      const playerName = player?.name;
+      if (playerName) {
+        const { updatePlayer, addSeenQuestion, addToReviewDeck, upsertTopicMastery, addGameHistory } = await import("@/lib/browser-db");
+        const isCorrect = data.reveal?.correct === true;
+        // XP
+        const xpGain = isCorrect ? 10 : 1;
+        await updatePlayer(playerName, { xp: (player?.xp ?? 0) + xpGain });
+        useApp.getState().setPlayer({ ...player, xp: (player?.xp ?? 0) + xpGain } as typeof player);
+        // Seen question
+        if (data.reveal?.questionId) {
+          await addSeenQuestion(playerName, data.reveal.questionId);
+        }
+        // Topic mastery
+        if (data.reveal?.topicId != null) {
+          await upsertTopicMastery(playerName, data.reveal.topicId, isCorrect);
+        }
+        // Review deck (wrong answers)
+        if (!isCorrect && data.reveal?.questionId) {
+          await addToReviewDeck(playerName, data.reveal.questionId);
+        }
+      }
+
       if (data.game?.status === "finished") {
         setWinnings(data.game.winnings);
         setEndedReason(data.game.reason === "summit_reached" ? "summit_reached" : "wrong_answer");
         setGameFinished(true);
+        // Save to game history
+        if (playerName) {
+          const { addGameHistory } = await import("@/lib/browser-db");
+          await addGameHistory({
+            playerName,
+            mode: "GIPFEL",
+            level: data.game.reason === "summit_reached" ? 15 : level,
+            winnings: data.game.winnings,
+            correct: 0,
+            total: level,
+            date: new Date().toISOString(),
+          });
+        }
       } else if (data.next) {
         setGameFinished(false);
       }

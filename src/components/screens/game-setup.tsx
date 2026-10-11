@@ -43,7 +43,7 @@ export function GameSetupScreen() {
       const res = await fetch("/api/games", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "GIPFEL", timerMode }),
+        body: JSON.stringify({ mode: "GIPFEL", timerMode, playerName: player?.name, schoolType: player?.schoolType, grade: player?.grade }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -93,9 +93,8 @@ export function GameSetupScreen() {
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2">
               <span className="font-display text-xl font-bold tracking-tight text-ink truncate">
-                {player?.displayName}
+                {player?.name}
               </span>
-              <span className="font-mono text-sm text-ink-dim/60">#{player?.tag}</span>
             </div>
             <div className="mt-0.5 text-sm text-ink-dim">
               {SCHOOL_TYPE_LABELS[player?.schoolType ?? ""] ?? player?.schoolType} · Klasse {player?.grade}

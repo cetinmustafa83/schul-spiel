@@ -1,7 +1,6 @@
 "use client";
 
 import { useApp } from "@/lib/store";
-import { Button } from "@/components/ui/button";
 import { GooeyButton, MetaBlobs } from "@/components/ui/gooey";
 import { formatTaler } from "@/lib/german";
 import { useScreenTransition } from "@/lib/animations/gsap-hooks";
@@ -14,7 +13,6 @@ export function LandingScreen() {
   const ref = useScreenTransition<HTMLDivElement>();
   const titleRef = useRef<HTMLHeadingElement>(null);
 
-  // Subtle title glow — refined, not flashy
   useEffect(() => {
     if (prefs.reducedMotion || !titleRef.current) return;
     const tl = gsap.to(titleRef.current, {
@@ -33,7 +31,6 @@ export function LandingScreen() {
         className="pointer-events-none fixed inset-0 z-0 opacity-90"
         reducedMotion={prefs.reducedMotion}
       />
-      {/* Meta blobs — ambient floating gooey blobs */}
       <MetaBlobs
         className="fixed inset-0 z-0"
         count={4}
@@ -59,24 +56,18 @@ export function LandingScreen() {
           <span className="font-semibold text-ink">{formatTaler(500000)} Taler Spielgeld</span> warten.
         </p>
 
-        <div className="flex w-full max-w-md flex-col gap-3">
+        <div className="w-full max-w-md">
           <GooeyButton
             size="lg"
             className="w-full h-14"
             blobColor="rgba(106, 122, 154, 0.4)"
-            onClick={() => navigate("register")}
+            onClick={() => navigate("onboarding")}
           >
-            Los geht&apos;s — Konto erstellen
+            Los geht&apos;s
           </GooeyButton>
-          <GooeyButton
-            size="lg"
-            variant="soft"
-            className="w-full h-14"
-            blobColor="rgba(139, 108, 255, 0.25)"
-            onClick={() => navigate("login")}
-          >
-            Ich habe schon ein Konto
-          </GooeyButton>
+          <p className="mt-3 text-xs text-ink-dim/60">
+            Keine Anmeldung, keine E-Mail. Dein Fortschritt bleibt im Browser gespeichert.
+          </p>
         </div>
 
         <div className="mt-12 grid w-full grid-cols-1 gap-3 sm:grid-cols-3">

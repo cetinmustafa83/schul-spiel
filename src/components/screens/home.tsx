@@ -2,38 +2,40 @@
 
 import { useEffect, useState } from "react";
 import { useApp } from "@/lib/store";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { SCHOOL_TYPE_LABELS, formatTaler } from "@/lib/german";
+import { countDueReview, getPlayer, getGameHistory } from "@/lib/browser-db";
 import {
-  Trophy, Target, Repeat, Calendar, User, Settings, LogOut, ChevronRight, Flame,
+  Trophy, Target, Repeat, Calendar, User, Settings, LogOut, ChevronRight,
 } from "lucide-react";
 
 export function HomeScreen() {
-  const { player, navigate, setPayload } = useApp();
+  const { player, navigate, setPlayer, pushToast } = useApp();
   const [dueCount, setDueCount] = useState(0);
-  const [dailyDone, setDailyDone] = useState(0);
-  const [dailyTotal, setDailyTotal] = useState(5);
-  const [rank, setRank] = useState<string>("Wanderer");
-  const [xp, setXp] = useState(player?.xp ?? 0);
+  const [bestLevel, setBestLevel] = useState(0);
+  const [bestWinnings, setBestWinnings] = useState(0);
+  const [totalGames, setTotalGames] = useState(0);
 
   useEffect(() => {
+    if (!player?.name) return;
     void (async () => {
       try {
-        const [statsRes, dailyRes] = await Promise.all([
-          fetch("/api/me/stats").then((r) => r.json()),
-          fetch("/api/daily").then((r) => r.json()),
+        const [due, p, history] = await Promise.all([
+          countDueReview(player.name),
+          getPlayer(player.name),
+          getGameHistory(player.name, 50),
         ]);
-        setDueCount(statsRes.stats?.dueCount ?? 0);
-        setRank(statsRes.player?.rank?.label ?? "Wanderer");
-        setXp(statsRes.player?.xp ?? 0);
-        setDailyDone((dailyRes.items ?? []).filter((i: { answered: boolean }) => i.answered).length);
-        setDailyTotal((dailyRes.items ?? []).length);
+        setDueCount(due);
+        if (p) {
+          setBestLevel(history.reduce((m, g) => Math.max(m, g.level), 0));
+          setBestWinnings(history.reduce((m, g) => Math.max(m, g.winnings), 0));
+          setTotalGames(history.length);
+        }
       } catch {
         // ignore
       }
     })();
-  }, []);
+  }, [player?.name]);
 
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col px-4 py-6 sm:px-6">
@@ -44,7 +46,7 @@ export function HomeScreen() {
           </div>
           <div>
             <div className="font-display text-xl font-bold text-ink">
-              Hallo, {player?.displayName}!
+              Hallo, {player?.name}!
             </div>
             <div className="text-xs text-ink-dim">
               {SCHOOL_TYPE_LABELS[player?.schoolType ?? ""] ?? player?.schoolType} · Klasse {player?.grade}
@@ -61,14 +63,16 @@ export function HomeScreen() {
         </button>
       </header>
 
-      {/* Rank/XP bar */}
+      {/* Stats bar */}
       <div className="mb-6 rounded-2xl border border-border bg-bg1/60 p-4 backdrop-blur">
         <div className="flex items-center justify-between text-sm">
-          <span className="font-display font-semibold text-ink-dim">{rank}</span>
-          <span className="text-ink-dim">{formatTaler(xp)} XP</span>
+          <span className="font-display font-semibold text-ink-dim">
+            {formatTaler(player?.xp ?? 0)} XP
+          </span>
+          <span className="text-ink-dim">{totalGames} Spiele</span>
         </div>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-bg2/60">
-          <div className="h-full bg-ink-dim/60 transition-all" style={{ width: `${Math.min(100, (xp % 100) + 20)}%` }} />
+          <div className="h-full bg-ink-dim/60 transition-all" style={{ width: `${Math.min(100, ((player?.xp ?? 0) % 100) + 20)}%` }} />
         </div>
       </div>
 
@@ -92,7 +96,7 @@ export function HomeScreen() {
         <ModeCard
           icon={<Calendar className="h-5 w-5" />}
           title="Tagesquiz"
-          subtitle={`${dailyDone}/${dailyTotal} heute beantwortet`}
+          subtitle="5 Fragen pro Tag"
           accent="from-sky/20"
           onClick={() => navigate("daily")}
         />
@@ -148,14 +152,16 @@ export function HomeScreen() {
 
       <button
         type="button"
-        onClick={async () => {
-          await fetch("/api/auth/logout", { method: "POST" });
-          useApp.getState().setPlayer(null);
+        onClick={() => {
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("wissensgipfel-last-player");
+          }
+          setPlayer(null);
           navigate("landing");
         }}
         className="tap-target mt-4 inline-flex items-center justify-center gap-2 text-sm text-ink-dim hover:text-coral"
       >
-        <LogOut className="h-4 w-4" /> Abmelden
+        <LogOut className="h-4 w-4" /> Spieler wechseln
       </button>
     </div>
   );

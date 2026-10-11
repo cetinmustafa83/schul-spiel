@@ -164,9 +164,9 @@ export function ProfileScreen() {
         </div>
         <div className="min-w-0 flex-1">
           <div className="font-display text-xl font-bold text-ink">
-            {player.displayName}
+            {player.name}
           </div>
-          <div className="text-xs text-ink-dim">#{player.tag}</div>
+          <div className="text-xs text-ink-dim">Klasse </div>
           <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-gold/15 px-2 py-0.5 text-xs font-semibold text-gold">
             <Award className="h-3.5 w-3.5" />
             {player.rank?.label ?? "Wanderer"}
@@ -287,7 +287,7 @@ export function ProfileScreen() {
                   </span>
                   <div>
                     <div className="text-sm text-ink">Stufe {g.currentLevel} erreicht</div>
-                    <div className="text-xs text-ink-dim">
+                    <div className="text-xs text-ink-dim">Klasse 
                       {g.endedAt ? new Date(g.endedAt).toLocaleDateString("de-DE") : ""}
                     </div>
                   </div>

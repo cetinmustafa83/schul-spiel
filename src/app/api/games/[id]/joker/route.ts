@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getCurrentPlayer } from "@/lib/session";
+
 import { catchRoute, errorResponse, json, jokerSchema, ApiError } from "@/lib/api";
 import { parseJokerState, serializeJokerState, fiftyFifty, audiencePoll, phoneLumi, type JokerState } from "@/lib/game/jokers";
 import { trackOfSchoolType, type PlayerContext, pickQuestionForLevel, tierForLevel } from "@/lib/game/selection";
@@ -11,10 +11,10 @@ export const runtime = "nodejs";
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }): Promise<NextResponse> {
   return catchRoute(async () => {
     const { id } = await params;
-    const p = await getCurrentPlayer();
+    
     if (!p) return errorResponse("UNAUTHORIZED", 401);
     const game = await db.game.findUnique({ where: { id } });
-    if (!game || game.playerId !== p.id) return errorResponse("NOT_FOUND", 404);
+    if (!game || game.playerId !== "") return errorResponse("NOT_FOUND", 404);
     if (game.status !== "in_progress") return errorResponse("GAME_OVER", 409, "Dieses Spiel ist bereits beendet.");
 
     const body = await req.json().catch(() => null);
@@ -100,7 +100,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const usedIds = used.map((u) => u.questionId);
       const track = trackOfSchoolType(game.track) === "basic" ? "basic" : trackOfSchoolType(game.track);
       // The track in the Game table is a string ("basic"/"mid"/"advanced") — pass through directly.
-      const ctx: PlayerContext = { playerId: p.id, grade: game.gradeAtStart, track: game.track as "basic" | "mid" | "advanced" };
+      const ctx: PlayerContext = { playerId: "", grade: game.gradeAtStart, track: game.track as "basic" | "mid" | "advanced" };
       const tier = tierForLevel(game.currentLevel);
       const picked = await pickQuestionForLevel(ctx, game.currentLevel, tier, usedIds, [], null, 0, new Set());
       if (!picked) {

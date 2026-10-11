@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getCurrentPlayer } from "@/lib/session";
 import { catchRoute, errorResponse, json } from "@/lib/api";
 import { z } from "zod";
 import { pickQuestionForLevel, tierForLevel, trackOfSchoolType, type PlayerContext } from "@/lib/game/selection";
@@ -13,28 +12,38 @@ export const runtime = "nodejs";
 const startSchema = z.object({
   mode: z.enum(["GIPFEL", "TRAINING", "DAILY", "REVIEW"]).default("GIPFEL"),
   timerMode: z.enum(["off", "relaxed", "challenge"]).default("off"),
+  playerName: z.string().min(1).max(40).optional(),
+  schoolType: z.string().min(2).max(4).optional(),
+  grade: z.number().int().min(5).max(8).optional(),
 });
 
 export async function POST(req: Request): Promise<NextResponse> {
   return catchRoute(async () => {
-    const p = await getCurrentPlayer();
-    if (!p) return errorResponse("UNAUTHORIZED", 401);
-
     const body = await req.json().catch(() => ({}));
     const parsed = startSchema.safeParse(body);
     if (!parsed.success) {
       return errorResponse("VALIDATION", 400, parsed.error.issues[0]?.message ?? "Eingabe ungültig.");
     }
-    const { mode, timerMode } = parsed.data;
+    const { mode, timerMode, playerName, schoolType, grade } = parsed.data;
+
+    // Browser-side mode: player info comes from the request body (LokiJS stores it client-side)
+    if (!playerName || !schoolType || !grade) {
+      return errorResponse("VALIDATION", 400, "Spielerinformationen fehlen.");
+    }
+    const playerNameStr = playerName;
+    const schoolTypeStr = schoolType;
+    const gradeNum = grade;
+
     if (mode !== "GIPFEL") {
       return errorResponse("VALIDATION", 400, "Dieser Modus wird hier nicht unterstützt. Nutze die jeweiligen Endpunkte für Training/Tagesquiz/Wiederholung.");
     }
 
-    const player = await db.player.findUnique({ where: { id: p.id } });
-    if (!player) return errorResponse("NOT_FOUND", 404);
-
-    const track = trackOfSchoolType(player.schoolType);
-    const ctx: PlayerContext = { playerId: player.id, grade: player.grade, track };
+    // Use a synthetic player ID (browser-side player has no server record).
+    // The game/questions are stored server-side for the duration of the game,
+    // but player stats (XP, history, seen) are tracked client-side via LokiJS.
+    const syntheticPlayerId = `browser-${playerNameStr}`;
+    const track = trackOfSchoolType(schoolTypeStr);
+    const ctx: PlayerContext = { playerId: syntheticPlayerId, grade: gradeNum, track };
     const ladder = await getLadder();
     const N = totalLevels(ladder);
 
@@ -44,20 +53,9 @@ export async function POST(req: Request): Promise<NextResponse> {
     let lastSubjectId: number | null = null;
     let consecutiveSameSubject = 0;
 
-    // Load "seen recently" set (last 10 games OR last 60 days).
-    const recentGameIds = (await db.game.findMany({
-      where: { playerId: player.id, mode: "GIPFEL", startedAt: { gte: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000) } },
-      orderBy: { startedAt: "desc" },
-      take: 10,
-      select: { id: true },
-    })).map((g) => g.id);
-    const seenRows = recentGameIds.length > 0
-      ? await db.gameQuestion.findMany({
-          where: { gameId: { in: recentGameIds } },
-          select: { questionId: true },
-        })
-      : [];
-    const seenRecently = new Set<number>(seenRows.map((s) => s.questionId));
+    // Server-side seen-questions tracking is disabled in browser mode (client tracks via LokiJS).
+    // Use empty seen set — the client will skip already-seen questions via its own logic.
+    const seenRecently = new Set<number>();
 
     const questions: Array<{ questionId: number; subjectId: number; introGrade: number; difficulty: number; level: number }> = [];
     for (let level = 1; level <= N; level++) {
@@ -104,9 +102,9 @@ export async function POST(req: Request): Promise<NextResponse> {
     await db.game.create({
       data: {
         id: gameId,
-        playerId: player.id,
+        playerId: syntheticPlayerId,
         mode: "GIPFEL",
-        gradeAtStart: player.grade,
+        gradeAtStart: gradeNum,
         track,
         currentLevel: 1,
         status: "in_progress",
@@ -124,15 +122,7 @@ export async function POST(req: Request): Promise<NextResponse> {
       },
     });
 
-    // Add all game questions to the player's seen-history.
-    for (const q of questions) {
-      await db.seenQuestion.upsert({
-        where: { playerId_questionId: { playerId: player.id, questionId: q.questionId } },
-        update: { lastSeenAt: now },
-        create: { playerId: player.id, questionId: q.questionId, lastSeenAt: now },
-      });
-    }
-
+    // Seen-history is tracked client-side via LokiJS — skip server-side seenQuestion.
     const first = await buildClientQuestion(gameId, 1);
     return json({ gameId, mode: "GIPFEL", level: 1, ladder, question: first, jokers: freshJokerState(), timerMode });
   });

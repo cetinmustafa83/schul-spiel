@@ -3,10 +3,7 @@
 import { useEffect } from "react";
 import { useApp, type Screen } from "@/lib/store";
 import { LandingScreen } from "@/components/screens/landing";
-import { RegisterScreen } from "@/components/screens/register";
-import { LoginScreen } from "@/components/screens/login";
-import { ResetPinScreen } from "@/components/screens/reset-pin";
-import { AccountCreatedScreen } from "@/components/screens/account-created";
+import { OnboardingScreen } from "@/components/screens/onboarding";
 import { HomeScreen } from "@/components/screens/home";
 import { GameSetupScreen } from "@/components/screens/game-setup";
 import { GameStageScreen } from "@/components/screens/game-stage";
@@ -18,13 +15,11 @@ import { ProfileScreen } from "@/components/screens/profile";
 import { SettingsScreen } from "@/components/screens/settings";
 import { LegalScreen } from "@/components/screens/legal";
 import { AnimatedBackground } from "@/components/three/animated-background";
+import { getDB, getPlayer } from "@/lib/browser-db";
 
 const SCREENS: Record<Screen, React.ComponentType> = {
   landing: LandingScreen,
-  register: RegisterScreen,
-  login: LoginScreen,
-  "reset-pin": ResetPinScreen,
-  "account-created": AccountCreatedScreen,
+  onboarding: OnboardingScreen,
   home: HomeScreen,
   "game-setup": GameSetupScreen,
   "game-stage": GameStageScreen,
@@ -43,19 +38,28 @@ const SCREENS: Record<Screen, React.ComponentType> = {
 export default function Page() {
   const { player, loadingPlayer, screen, setPlayer, setLoadingPlayer, navigate, prefs, setPrefs } = useApp();
 
-  // Bootstrap session on first load.
+  // Bootstrap — load player from LokiJS (browser localStorage)
   useEffect(() => {
-    (async () => {
+    void (async () => {
       try {
-        const res = await fetch("/api/me", { cache: "no-store" });
-        if (res.ok) {
-          const data = await res.json();
-          setPlayer(data);
-          navigate("home");
-          if (data.prefs) setPrefs(data.prefs);
-        } else {
-          navigate("landing");
+        await getDB();
+        // Check if there's a "last active" player stored
+        const lastName = typeof window !== "undefined" ? localStorage.getItem("wissensgipfel-last-player") : null;
+        if (lastName) {
+          const p = await getPlayer(lastName);
+          if (p) {
+            setPlayer({
+              name: p.name,
+              schoolType: p.schoolType,
+              grade: p.grade,
+              avatarId: p.avatarId,
+              xp: p.xp,
+            });
+            navigate("home");
+            return;
+          }
         }
+        navigate("landing");
       } catch {
         navigate("landing");
       } finally {
@@ -64,46 +68,42 @@ export default function Page() {
     })();
   }, []);
 
-  // Apply reduced-motion + text-scale prefs as CSS variables on <html>.
+  // Apply reduced-motion + text-scale prefs
   useEffect(() => {
     if (typeof document === "undefined") return;
     document.documentElement.style.fontSize = `${prefs.textScale}%`;
     document.documentElement.classList.toggle("reduce-motion", prefs.reducedMotion);
   }, [prefs.textScale, prefs.reducedMotion]);
 
-  // Apply dyslexia-friendly font class.
+  // Apply dyslexia-friendly font class
   useEffect(() => {
     if (typeof document === "undefined") return;
     document.documentElement.classList.toggle("dyslexia", prefs.dyslexia);
   }, [prefs.dyslexia]);
 
-  // Auth gate: if a screen requires auth and no player, send to landing.
-  // This must run inside an effect — calling navigate() during render
-  // would trigger a setState-in-render error.
+  // Auth gate — if screen requires player and none exists, go to landing
   useEffect(() => {
     if (loadingPlayer) return;
-    const requiresAuth = !["landing", "register", "login", "reset-pin", "account-created"].includes(screen);
-    if (requiresAuth && !player) {
+    const requiresPlayer = !["landing", "onboarding"].includes(screen);
+    if (requiresPlayer && !player) {
       navigate("landing");
     }
   }, [screen, player, loadingPlayer, navigate]);
 
   if (loadingPlayer) {
     return (
-      <main className="starfield relative flex min-h-screen items-center justify-center">
-        <div className="mountains" />
+      <main className="relative flex min-h-screen items-center justify-center">
+        <AnimatedBackground reducedMotion={prefs.reducedMotion} particles particleType="dust" particleCount={20} />
         <div className="relative z-10 flex flex-col items-center gap-4 text-center">
           <div className="animate-pulse text-6xl">🏔️</div>
-          <p className="font-display text-xl text-ink">Wissensgipfel wird geladen …</p>
+          <p className="font-display text-xl text-ink">Wird geladen …</p>
         </div>
       </main>
     );
   }
 
-  // If auth is required but missing, render a minimal placeholder
-  // while the effect above redirects to landing.
-  const requiresAuth = !["landing", "register", "login", "reset-pin", "account-created"].includes(screen);
-  if (requiresAuth && !player) {
+  const requiresPlayer = !["landing", "onboarding"].includes(screen);
+  if (requiresPlayer && !player) {
     return null;
   }
 

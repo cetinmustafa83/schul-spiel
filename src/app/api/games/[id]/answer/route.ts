@@ -1,21 +1,20 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getCurrentPlayer } from "@/lib/session";
+
 import { catchRoute, errorResponse, json, answerSchema, ApiError } from "@/lib/api";
 import { getLadder, fallbackWinnings, levelWinnings, totalLevels } from "@/lib/game/ladder";
 import { parseJokerState, serializeJokerState, type JokerState } from "@/lib/game/jokers";
 import { buildClientQuestion } from "@/app/api/games/route";
-import { addToReviewDeck } from "@/lib/game/leitner";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }): Promise<NextResponse> {
   return catchRoute(async () => {
     const { id } = await params;
-    const p = await getCurrentPlayer();
+    
     if (!p) return errorResponse("UNAUTHORIZED", 401);
     const game = await db.game.findUnique({ where: { id } });
-    if (!game || game.playerId !== p.id) return errorResponse("NOT_FOUND", 404);
+    if (!game || game.playerId !== "") return errorResponse("NOT_FOUND", 404);
     if (game.status !== "in_progress") return errorResponse("GAME_OVER", 409, "Dieses Spiel ist bereits beendet.");
 
     const body = await req.json().catch(() => null);
@@ -63,18 +62,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       });
     }
 
-    // Update topic mastery.
-    await db.topicMastery.upsert({
-      where: { playerId_topicId: { playerId: p.id, topicId: gq.question.topicId } },
-      update: { attempts: { increment: 1 }, correct: { increment: correct } },
-      create: { playerId: p.id, topicId: gq.question.topicId, attempts: 1, correct },
-    });
-
-    // Award XP (correct = +10, wrong = +1 for trying).
-    await db.player.update({
-      where: { id: p.id },
-      data: { xp: { increment: correct ? 10 : 1 } },
-    });
+    // Topic mastery + XP + review deck are tracked client-side via LokiJS.
+    // Skip server-side writes for these (no server player record in browser mode).
 
     const ladder = await getLadder();
     const currentLevel = game.currentLevel;
@@ -92,11 +81,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       // shuffledOptions aligned to the client
       shuffledOptions: order.map((idx) => [gq.question.optA, gq.question.optB, gq.question.optC, gq.question.optD][idx]),
       topic: { code: gq.question.topic.code, label: gq.question.topic.label },
+      questionId: gq.questionId,
+      topicId: gq.question.topicId,
     };
 
-    // If wrong: add to review deck, end game with fallback winnings.
+    // If wrong: end game with fallback winnings.
+    // (Review deck is added client-side via LokiJS.)
     if (correct !== 1) {
-      await addToReviewDeck(p.id, gq.questionId);
       const fallback = fallbackWinnings(ladder, currentLevel - 1);
       await db.game.update({
         where: { id },
