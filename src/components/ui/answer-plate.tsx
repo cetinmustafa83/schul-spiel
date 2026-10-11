@@ -15,11 +15,12 @@ interface AnswerPlateProps {
   index?: number;
 }
 
+// Muted, sophisticated accent colors — neutral palette
 const IDLE_COLOR: Record<AnswerPlateProps["letter"], string> = {
-  A: "#7C6CFF",
-  B: "#31B7E6",
-  C: "#F2A93B",
-  D: "#E86CB5",
+  A: "#6a7a9a",  // muted slate blue
+  B: "#5a8a9a",  // muted teal
+  C: "#9a8a6a",  // muted bronze
+  D: "#8a6a8a",  // muted plum
 };
 
 export function AnswerPlate({

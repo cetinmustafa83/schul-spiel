@@ -520,3 +520,46 @@ Stage Summary:
 - Atmospheric fog + volumetric god rays + drifting dust = depth and mood
 - Cinematic post-processing: bloom + vignette + contrast + desaturation + cool tint
 - All animations preserved (game-feel system intact)
+
+
+---
+Task ID: 15
+Agent: orchestrator (GLM Code) — complete neutral palette rollout + more LLM questions
+Task: Apply the neutral/cinematic redesign to ALL remaining screens, generate more LLM questions
+
+Work Log:
+- User said "keep going" — continued the neutral redesign across all screens.
+- Muted AnswerPlate accent colors from saturated (violet/blue/orange/pink) to neutral:
+  - A: #6a7a9a (muted slate blue)
+  - B: #5a8a9a (muted teal)
+  - C: #9a8a6a (muted bronze)
+  - D: #8a6a8a (muted plum)
+- Game-stage updates:
+  - Top bar: removed gold Taler display → neutral ink text
+  - Joker bar: removed gold hover/active states → neutral ink-dim
+  - Encouragement section: wrapped Lumi in a bordered box, muted text
+  - Result screen: removed emoji (🏔️🎉🚪🦉), removed gold gradient card, replaced with clean Trophy icon in bordered box, neutral ink text for winnings
+- Home screen updates:
+  - Play button: removed gold gradient + plate-glow-gold → clean border + bg-bg1/60
+  - XP bar: removed gold fill → ink-dim/60
+  - Rank label: removed gold → ink-dim
+  - ModeCard: removed gradient backgrounds + gold icon accents → neutral border + bg-bg2/40 icons
+- LLM question generation:
+  - Ran generation for MA (Mathematik) — 40 new questions generated across topics: zahlenraum, einmaleins, groessen, kopfrechnen
+  - Hit API rate-limit (429) during generation — EN and BIO queued for later
+  - Re-seeded DB: 443 total questions (403 seed + 40 LLM-MA)
+- Verified with Agent Browser:
+  - Landing renders with cinematic 3D scene — no errors
+  - Login → Home → Game setup → Game stage works
+  - Question + answer plates + jokers + ladder all render with neutral palette
+  - Answer → Final → reveal (correct plate marked) works
+  - Lint: 0 errors, 0 warnings
+  - Server: HTTP 200
+
+Stage Summary:
+- The entire UI is now consistently neutral and sophisticated — no saturated gold/mint/coral accents remain in the interactive elements
+- AnswerPlate colors are muted and professional
+- All gold gradients, glow effects, and emoji have been replaced with clean borders, borders, and geometric/Trophy icons
+- The 3D cinematic background scene provides the visual interest, while the UI stays calm and readable
+- 443 questions in the DB (403 hand-curated + 40 LLM-generated MA)
+- All animations (GSAP game-feel, 3D scene) preserved and working

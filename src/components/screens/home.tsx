@@ -64,11 +64,11 @@ export function HomeScreen() {
       {/* Rank/XP bar */}
       <div className="mb-6 rounded-2xl border border-border bg-bg1/60 p-4 backdrop-blur">
         <div className="flex items-center justify-between text-sm">
-          <span className="font-display font-semibold text-gold">{rank}</span>
+          <span className="font-display font-semibold text-ink-dim">{rank}</span>
           <span className="text-ink-dim">{formatTaler(xp)} XP</span>
         </div>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-bg2/60">
-          <div className="h-full bg-gold transition-all" style={{ width: `${Math.min(100, (xp % 100) + 20)}%` }} />
+          <div className="h-full bg-ink-dim/60 transition-all" style={{ width: `${Math.min(100, (xp % 100) + 20)}%` }} />
         </div>
       </div>
 
@@ -76,14 +76,14 @@ export function HomeScreen() {
       <button
         type="button"
         onClick={() => navigate("game-setup")}
-        className="group mb-4 flex items-center justify-between gap-4 rounded-3xl border-2 border-gold/40 bg-gradient-to-br from-gold/20 to-bg1 p-6 text-left transition-all hover:from-gold/30 hover:border-gold/60 plate-glow-gold"
+        className="group mb-4 flex items-center justify-between gap-4 rounded-2xl border border-border bg-bg1/60 p-6 text-left backdrop-blur transition-all hover:border-ink-dim/30 hover:bg-bg1/80"
       >
         <div>
           <div className="font-display text-2xl font-extrabold text-ink">Spiel starten</div>
           <div className="mt-1 text-sm text-ink-dim">Klettere die 15-Stufen-Leiter bis zu 500.000 Taler.</div>
         </div>
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gold text-bg0 transition-transform group-hover:scale-110">
-          <Trophy className="h-7 w-7" />
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-border bg-bg2/60 text-ink transition-transform group-hover:scale-110">
+          <Trophy className="h-6 w-6" />
         </div>
       </button>
 
@@ -169,18 +169,14 @@ interface ModeCardProps {
   onClick: () => void;
 }
 
-function ModeCard({ icon, title, subtitle, accent, onClick }: ModeCardProps) {
+function ModeCard({ icon, title, subtitle, accent: _accent, onClick }: ModeCardProps) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={cn(
-        "group flex items-center gap-4 rounded-2xl border border-border bg-gradient-to-br p-4 text-left transition-all hover:border-gold/40",
-        accent,
-        "to-bg1"
-      )}
+      className="group flex items-center gap-4 rounded-2xl border border-border bg-bg1/60 p-4 text-left backdrop-blur transition-all hover:border-ink-dim/30 hover:bg-bg1/80"
     >
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-bg2/70 text-gold transition-transform group-hover:scale-110">
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-border bg-bg2/40 text-ink-dim transition-transform group-hover:scale-110">
         {icon}
       </div>
       <div className="min-w-0 flex-1">

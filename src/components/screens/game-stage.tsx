@@ -241,8 +241,8 @@ export function GameStageScreen() {
         </button>
         <div className="flex items-center gap-2 rounded-full bg-bg2/40 px-4 py-1.5">
           <span className="text-sm text-ink-dim">Stufe {level} / 15</span>
-          <span className="text-gold">·</span>
-          <span className="font-display text-sm font-bold text-gold">{formatTaler(ladder.find((s) => s.level === level)?.amount ?? 0)} Taler</span>
+          <span className="text-ink-dim/50">·</span>
+          <span className="font-display text-sm font-bold text-ink">{formatTaler(ladder.find((s) => s.level === level)?.amount ?? 0)} Taler</span>
         </div>
       </header>
 
@@ -360,13 +360,13 @@ export function GameStageScreen() {
                   className={cn(
                     "tap-target flex flex-col items-center gap-1 rounded-xl border-2 px-2 py-3 text-xs transition-all",
                     available
-                      ? "border-border bg-bg2/40 text-ink hover:border-gold/50 hover:text-gold"
+                      ? "border-border bg-bg2/40 text-ink hover:border-ink-dim/50 hover:bg-bg2/60"
                       : "border-border/40 bg-bg2/20 text-ink-dim/50 opacity-50"
                   )}
                   aria-label={j.label}
                   aria-disabled={!available}
                 >
-                  <span className={available ? "text-gold" : "text-ink-dim"}>{j.icon}</span>
+                  <span className={available ? "text-ink-dim" : "text-ink-dim/50"}>{j.icon}</span>
                   <span className="font-display font-semibold">{j.label}</span>
                   {!available && <span className="text-[10px] text-ink-dim">verbraucht</span>}
                 </button>
@@ -374,13 +374,15 @@ export function GameStageScreen() {
             })}
           </div>
 
-          {/* Lumi encouragement */}
+          {/* Encouragement */}
           <div className="flex items-center gap-3 rounded-2xl border border-border bg-bg1/40 p-3">
-            <Lumi pose={phase === "revealing" ? "thinking" : "idle"} size={48} />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-bg2/40 text-ink-dim">
+              <Lumi pose={phase === "revealing" ? "thinking" : "idle"} size={40} />
+            </div>
             <p className="text-sm text-ink-dim">
-              {phase === "asking" && "Du schaffst das! Lies die Frage in Ruhe."}
-              {phase === "revealing" && reveal?.correct && "Stark! Weiter geht's."}
-              {phase === "revealing" && !reveal?.correct && "Knapp daneben — schau dir die Erklärung an."}
+              {phase === "asking" && "Lies die Frage in Ruhe. Du schaffst das."}
+              {phase === "revealing" && reveal?.correct && "Richtig. Weiter zur nächsten Stufe."}
+              {phase === "revealing" && !reveal?.correct && "Knapp daneben. Schau dir die Erklärung an."}
             </p>
           </div>
         </div>
@@ -571,36 +573,37 @@ interface ResultScreenProps {
 }
 
 function ResultScreen({ reason, winnings, level, onHome, onAgain }: ResultScreenProps) {
-  const emoji = reason === "summit_reached" ? "🏔️🎉" : reason === "walked_away" ? "🚪" : "🦉";
   const title = reason === "summit_reached"
-    ? "Gipfel erreicht!"
+    ? "Gipfel erreicht"
     : reason === "walked_away"
-    ? "Klug ausgestiegen!"
-    : "Knapp daneben!";
+    ? "Klug ausgestiegen"
+    : "Knapp daneben";
   const subtitle = reason === "summit_reached"
-    ? `Du hast die 15. Stufe erklommen und ${formatTaler(500000)} Taler Spielgeld gewonnen!`
+    ? `Du hast die 15. Stufe erklommen und ${formatTaler(500000)} Taler Spielgeld gewonnen.`
     : reason === "walked_away"
-    ? `Du gehst mit ${formatTaler(winnings)} Talern nach Hause. Gut gemacht!`
+    ? `Du gehst mit ${formatTaler(winnings)} Talern nach Hause.`
     : `Du landest auf der Sicherheitsstufe mit ${formatTaler(winnings)} Talern.`;
 
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-4 py-8 text-center">
-      <div className="mb-4 text-6xl" aria-hidden>{emoji}</div>
-      <h1 className="font-display text-3xl font-extrabold text-ink">{title}</h1>
-      <p className="mt-2 text-ink-dim">{subtitle}</p>
+      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-bg1/60">
+        <Trophy className="h-8 w-8 text-ink-dim" />
+      </div>
+      <h1 className="font-display text-3xl font-extrabold tracking-tight text-ink">{title}</h1>
+      <p className="mt-3 text-ink-dim leading-relaxed">{subtitle}</p>
 
-      <div className="my-8 w-full rounded-3xl border-2 border-gold/40 bg-gradient-to-br from-gold/10 to-bg1 p-6">
-        <div className="text-xs uppercase tracking-wide text-gold">Deine Gewinn</div>
-        <div className="mt-1 font-display text-4xl font-extrabold text-gold">
+      <div className="my-8 w-full rounded-2xl border border-border bg-bg1/60 p-6 backdrop-blur">
+        <div className="text-xs uppercase tracking-wider text-ink-dim">Deine Gewinn</div>
+        <div className="mt-2 font-display text-4xl font-extrabold text-ink">
           {formatTaler(winnings)}
         </div>
         <div className="text-sm text-ink-dim">Taler Spielgeld</div>
-        <div className="mt-3 text-xs text-ink-dim">Erreichte Stufe: {level} / 15</div>
+        <div className="mt-3 border-t border-border pt-3 text-xs text-ink-dim">Erreichte Stufe: {level} / 15</div>
       </div>
 
       <div className="flex w-full flex-col gap-3">
         <Button size="lg" className="h-14 font-display font-bold" onClick={onAgain}>
-          <Trophy className="mr-2 h-5 w-5" /> Nochmal spielen
+          Nochmal spielen
         </Button>
         <Button size="lg" variant="outline" className="h-14" onClick={onHome}>
           Zum Hauptmenü
