@@ -13,7 +13,7 @@ interface Grade { grade: number; label: string; }
 interface Avatar { id: number; code: string; label: string; emoji: string; }
 
 export function RegisterScreen() {
-  const { navigate, setPayload, pushToast } = useApp();
+  const { navigate, setPayload, setPlayer, pushToast } = useApp();
   const [step, setStep] = useState(0);
   const [displayName, setDisplayName] = useState("");
   const [schoolTypes, setSchoolTypes] = useState<SchoolType[]>([]);
@@ -104,6 +104,17 @@ export function RegisterScreen() {
         setSubmitting(false);
         return;
       }
+      // Set the player in the Zustand store so the auth-gate doesn't
+      // bounce us back to landing after account-created → home.
+      setPlayer({
+        id: data.id,
+        displayName: data.displayName,
+        tag: data.tag,
+        schoolType: data.schoolType,
+        grade: data.grade,
+        avatarId: data.avatarId ?? null,
+        xp: data.xp ?? 0,
+      });
       setPayload({
         handle: data.handle,
         displayName: data.displayName,

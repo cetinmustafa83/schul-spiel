@@ -18,6 +18,7 @@ export function LoginScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   async function submit(finalPin?: string) {
+    if (submitting) return;
     const pinValue = finalPin ?? pin;
     if (displayName.length < 3 || tag.length !== 4 || pinValue.length !== 4) {
       setError("Bitte Spielname, Tag und PIN eingeben.");
@@ -35,6 +36,8 @@ export function LoginScreen() {
       if (!res.ok) {
         setError(data.message ?? "Login fehlgeschlagen.");
         setSubmitting(false);
+        // Clear the PIN so the user can re-enter it.
+        setPin("");
         return;
       }
       setPlayer(data);
@@ -43,6 +46,7 @@ export function LoginScreen() {
     } catch {
       setError("Etwas ist schiefgelaufen.");
       setSubmitting(false);
+      setPin("");
     }
   }
 
@@ -67,7 +71,7 @@ export function LoginScreen() {
 
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="dn">Spielname</Label>
+            <Label htmlFor="dn">Spielname (ohne #Tag)</Label>
             <Input
               id="dn"
               value={displayName}
@@ -76,6 +80,9 @@ export function LoginScreen() {
               className="h-12"
               autoFocus
             />
+            <p className="text-xs text-ink-dim">
+              Nur der Name, ohne die 4-stellige Nummer.
+            </p>
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="tag">Tag (4 Ziffern)</Label>

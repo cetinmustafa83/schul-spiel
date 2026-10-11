@@ -81,11 +81,15 @@ export async function POST(req: Request): Promise<NextResponse> {
     await createSession(player.id);
 
     return json({
+      id: player.id,
       handle: `${displayName}#${tag}`,
       displayName,
       tag,
-      rescueCode,
+      schoolType,
+      grade,
       avatarId: player.avatarId,
+      xp: player.xp,
+      rescueCode,
     });
   });
 }

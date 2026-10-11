@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, Delete } from "lucide-react";
 
 interface PinPadProps {
@@ -24,15 +24,19 @@ export function PinPad({
   className,
 }: PinPadProps) {
   const [revealed, setRevealed] = useState(false);
+  // Keep a ref to the latest onSubmit so setTimeout doesn't call a stale closure.
+  const submitRef = useRef(onSubmit);
+  useEffect(() => {
+    submitRef.current = onSubmit;
+  }, [onSubmit]);
 
   const press = (digit: string) => {
     if (value.length >= length) return;
     const next = value + digit;
     onChange(next);
-    if (next.length === length && onSubmit) {
-      // Use the freshly-computed value, not the closure-stale `value`.
+    if (next.length === length) {
       const final = next;
-      setTimeout(() => onSubmit(final), 150);
+      setTimeout(() => submitRef.current?.(final), 150);
     }
   };
   const backspace = () => onChange(value.slice(0, -1));
@@ -99,7 +103,7 @@ export function PinPad({
         </button>
         <button
           type="button"
-          onClick={() => onSubmit && onSubmit(value)}
+          onClick={() => submitRef.current?.(value)}
           disabled={value.length !== length}
           className="tap-target rounded-xl bg-gold/20 py-4 text-sm font-semibold text-gold hover:bg-gold/30 disabled:opacity-40 transition-colors"
           aria-label="Bestätigen"
