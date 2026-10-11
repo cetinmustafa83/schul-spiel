@@ -76,6 +76,17 @@ export default function Page() {
     document.documentElement.classList.toggle("dyslexia", prefs.dyslexia);
   }, [prefs.dyslexia]);
 
+  // Auth gate: if a screen requires auth and no player, send to landing.
+  // This must run inside an effect — calling navigate() during render
+  // would trigger a setState-in-render error.
+  useEffect(() => {
+    if (loadingPlayer) return;
+    const requiresAuth = !["landing", "register", "login", "reset-pin", "account-created"].includes(screen);
+    if (requiresAuth && !player) {
+      navigate("landing");
+    }
+  }, [screen, player, loadingPlayer, navigate]);
+
   if (loadingPlayer) {
     return (
       <main className="starfield relative flex min-h-screen items-center justify-center">
@@ -88,10 +99,11 @@ export default function Page() {
     );
   }
 
-  // Auth gate: if a screen requires auth and no player, send to landing.
+  // If auth is required but missing, render a minimal placeholder
+  // while the effect above redirects to landing.
   const requiresAuth = !["landing", "register", "login", "reset-pin", "account-created"].includes(screen);
   if (requiresAuth && !player) {
-    navigate("landing");
+    return null;
   }
 
   const Screen = SCREENS[screen] ?? LandingScreen;
