@@ -405,18 +405,17 @@ export function GameStageScreen() {
 
       {/* Final-answer confirm sheet */}
       <Sheet open={finalSheet} onOpenChange={setFinalSheet}>
-        <SheetContent side="bottom" className="rounded-t-3xl border-t-2 border-gold/40 bg-bg1 p-6">
+        <SheetContent side="bottom" className="rounded-t-3xl border-t border-border bg-bg1 p-6 backdrop-blur-xl">
           <SheetHeader>
-            <SheetTitle className="text-center font-display text-xl text-ink">
+            <SheetTitle className="text-center font-display text-xl tracking-tight text-ink">
               Ist das deine finale Antwort?
             </SheetTitle>
             <SheetDescription className="text-center text-ink-dim">
               {selected != null && question && (
-                <span>
-                  Deine Wahl:{" "}
-                  <span className="font-bold text-gold">
-                    {LETTERS[selected]} — {question.options[selected]}
-                  </span>
+                <span className="mt-2 inline-flex items-center gap-2 rounded-lg border border-border bg-bg2/40 px-4 py-2">
+                  <span className="font-mono text-sm text-ink-dim">{LETTERS[selected]}</span>
+                  <span className="text-ink-dim/40">·</span>
+                  <span className="font-display font-semibold text-ink">{question.options[selected]}</span>
                 </span>
               )}
             </SheetDescription>
@@ -434,12 +433,15 @@ export function GameStageScreen() {
 
       {/* Walk-away confirm dialog */}
       <Dialog open={walkAwayDialog} onOpenChange={setWalkAwayDialog}>
-        <DialogContent className="bg-bg1 border-border">
+        <DialogContent className="bg-bg1 border-border backdrop-blur-xl">
           <DialogHeader>
-            <DialogTitle className="text-center font-display text-xl text-ink">Aussteigen?</DialogTitle>
+            <DialogTitle className="text-center font-display text-xl tracking-tight text-ink">Aussteigen?</DialogTitle>
             <DialogDescription className="text-center text-ink-dim">
-              Du behältst deine bisherigen <span className="font-bold text-gold">{formatTaler(ladder.find((s) => s.level === level - 1)?.amount ?? 0)} Taler</span>.
-              Bist du sicher?
+              Du behältst deine bisherigen{" "}
+              <span className="inline-block rounded border border-border bg-bg2/40 px-2 py-0.5 font-display font-semibold text-ink tabular-nums">
+                {formatTaler(ladder.find((s) => s.level === level - 1)?.amount ?? 0)} Taler
+              </span>
+              . Bist du sicher?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex gap-3">
@@ -455,9 +457,9 @@ export function GameStageScreen() {
 
       {/* Audience joker modal */}
       <Dialog open={jokerModal === "audience"} onOpenChange={(o) => !o && setJokerModal(null)}>
-        <DialogContent className="bg-bg1 border-border">
+        <DialogContent className="bg-bg1 border-border backdrop-blur-xl">
           <DialogHeader>
-            <DialogTitle className="font-display text-xl text-ink">Klassen-Umfrage</DialogTitle>
+            <DialogTitle className="font-display text-xl tracking-tight text-ink">Klassen-Umfrage</DialogTitle>
             <DialogDescription className="text-ink-dim">
               Umfrage unter Mitspieler:innen — kein echtes Ergebnis, nur ein Tipp.
             </DialogDescription>
@@ -466,18 +468,21 @@ export function GameStageScreen() {
             <div className="mt-4 space-y-3">
               {audiencePoll.map((pct, idx) => (
                 <div key={idx} className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-bg2/60 font-display text-sm font-bold text-ink">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-bg2/40 font-mono text-sm font-bold text-ink">
                     {LETTERS[idx]}
                   </div>
                   <div className="flex-1">
-                    <div className="h-6 overflow-hidden rounded-full bg-bg2/40">
+                    <div className="h-7 overflow-hidden rounded-md border border-border bg-bg2/20">
                       <div
-                        className="h-full bg-gold transition-all duration-700"
-                        style={{ width: `${pct}%` }}
+                        className="h-full transition-all duration-700"
+                        style={{
+                          width: `${pct}%`,
+                          background: "linear-gradient(90deg, rgba(106,122,154,0.6), rgba(160,170,200,0.8))",
+                        }}
                       />
                     </div>
                   </div>
-                  <div className="w-12 text-right font-display text-sm font-bold text-gold tabular-nums">{pct}%</div>
+                  <div className="w-12 text-right font-display text-sm font-bold text-ink tabular-nums">{pct}%</div>
                 </div>
               ))}
             </div>
@@ -490,21 +495,23 @@ export function GameStageScreen() {
 
       {/* Phone joker modal */}
       <Dialog open={jokerModal === "phone"} onOpenChange={(o) => !o && setJokerModal(null)}>
-        <DialogContent className="bg-bg1 border-border">
+        <DialogContent className="bg-bg1 border-border backdrop-blur-xl">
           <DialogHeader>
-            <DialogTitle className="font-display text-xl text-ink">Lumi fragen</DialogTitle>
+            <DialogTitle className="font-display text-xl tracking-tight text-ink">Lumi fragen</DialogTitle>
             <DialogDescription className="text-ink-dim">
               Lumi überlegt sich eine Antwort — sie kann sich auch irren!
             </DialogDescription>
           </DialogHeader>
           {phoneSuggests && question && (
-            <div className="mt-2 flex items-start gap-3 rounded-2xl border border-border bg-bg2/30 p-4">
-              <Lumi pose="thinking" size={56} />
+            <div className="mt-2 flex items-start gap-3 rounded-xl border border-border bg-bg2/30 p-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-border bg-bg2/40">
+                <Lumi pose="thinking" size={48} />
+              </div>
               <div>
-                <p className="text-sm text-ink">{phoneSuggests.phrase}</p>
+                <p className="text-sm text-ink leading-relaxed">{phoneSuggests.phrase}</p>
                 <p className="mt-2 text-xs text-ink-dim">
                   Lumi tippt auf:{" "}
-                  <span className="font-bold text-gold">
+                  <span className="inline-block rounded border border-border bg-bg2/40 px-2 py-0.5 font-display font-semibold text-ink">
                     {LETTERS[phoneSuggests.suggests]} — {question.options[phoneSuggests.suggests]}
                   </span>
                 </p>
@@ -535,25 +542,43 @@ function RevealCard({ reveal, onNext, gameFinished, revealCorrect }: RevealCardP
   const label = !revealCorrect || gameFinished ? "Zum Ergebnis" : "Weiter";
   return (
     <div
-      className={cn(
-        "mt-4 rounded-2xl border-2 p-4 backdrop-blur",
-        reveal.correct ? "border-mint/40 bg-mint/10" : "border-coral/40 bg-coral/10"
-      )}
+      className="mt-4 rounded-2xl border p-4 backdrop-blur-xl"
+      style={{
+        background: reveal.correct
+          ? "linear-gradient(135deg, rgba(61,219,164,0.08), rgba(61,219,164,0.02))"
+          : "linear-gradient(135deg, rgba(255,107,122,0.08), rgba(255,107,122,0.02))",
+        borderColor: reveal.correct ? "rgba(61,219,164,0.4)" : "rgba(255,107,122,0.4)",
+        boxShadow: reveal.correct
+          ? "0 0 20px rgba(61,219,164,0.15), 0 8px 24px rgba(0,0,0,0.3)"
+          : "0 0 20px rgba(255,107,122,0.15), 0 8px 24px rgba(0,0,0,0.3)",
+      }}
     >
       <div className="flex items-center gap-3">
-        {reveal.correct ? (
-          <CheckCircle2 className="h-6 w-6 text-mint" />
-        ) : (
-          <XCircle className="h-6 w-6 text-coral" />
-        )}
-        <div>
-          <div className="font-display text-lg font-bold text-ink">
-            {reveal.correct ? "Richtig!" : "Knapp daneben!"}
+        <div
+          className="flex h-10 w-10 items-center justify-center rounded-lg border"
+          style={{
+            borderColor: reveal.correct ? "rgba(61,219,164,0.4)" : "rgba(255,107,122,0.4)",
+            background: reveal.correct ? "rgba(61,219,164,0.1)" : "rgba(255,107,122,0.1)",
+          }}
+        >
+          {reveal.correct ? (
+            <CheckCircle2 className="h-5 w-5 text-mint" />
+          ) : (
+            <XCircle className="h-5 w-5 text-coral" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="font-display text-lg font-bold tracking-tight text-ink">
+            {reveal.correct ? "Richtig" : "Knapp daneben"}
           </div>
-          <div className="text-xs text-ink-dim">Thema: {reveal.topic.label}</div>
+          <div className="text-xs text-ink-dim">
+            Thema: <span className="text-ink-dim/80">{reveal.topic.label}</span>
+          </div>
         </div>
       </div>
-      <p className="mt-3 text-sm text-ink">{reveal.explanation}</p>
+      <p className="mt-3 border-t border-border/50 pt-3 text-sm text-ink leading-relaxed">
+        {reveal.explanation}
+      </p>
       <div className="mt-4 flex justify-end">
         <Button onClick={onNext} size="lg" className="h-12 font-display font-bold">
           {label}

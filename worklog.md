@@ -627,3 +627,78 @@ Stage Summary:
 - Ladder rail enhanced with diamond bullets + active gradient highlight
 - All changes are IP-safe (no hexagonal plates, no blue stage, original brand preserved)
 - Neutral muted palette maintained (no return to saturated gold/colors)
+
+
+---
+Task ID: 17
+Agent: orchestrator (GLM Code) — premium UI polish (ladder, modals, reveal)
+Task: Continue UI/UX improvements — Taler-Leiter + final-answer sheet + joker modals + reveal card
+
+Work Log:
+- User: "güzel ui/ux düzeltmeye devam edelim. Die Taler-Leiter -> burasi da dahil"
+- Completely rewrote `src/components/ui/ladder-rail.tsx` with premium Millionaire-inspired styling:
+
+  **RailLadder (sidebar variant)**:
+  - Diamond bullet points (◆) with drop-shadow on active
+  - Two-digit zero-padded level numbers (01, 02, ...) in monospace font
+  - Active level: gradient background + border + glow shadow + left edge accent bar
+  - Past levels: subtle mint/70 background tint
+  - Safe levels: ⛺ icon + mint color
+  - Compact spacing (gap-0.5, py-2)
+  - Smooth opacity pulse on active level (1.5s yoyo)
+  - Active level text: bold ink, larger size
+
+  **MountainLadder (SVG variant)**:
+  - Gradient stroke on path (muted grey → lighter grey)
+  - Glow filter on current marker
+  - Snow cap with reduced opacity
+  - Safe stations with ⛺
+  - Summit beacon with pulsing animation
+  - Station labels in monospace font
+
+- Polished **final-answer confirm sheet**:
+  - backdrop-blur-xl for depth
+  - Selected answer shown in a bordered pill (letter + · + text)
+  - Removed gold border → neutral border-border
+  - tracking-tight title
+
+- Polished **walk-away dialog**:
+  - Taler amount shown in bordered pill (not gold text)
+  - backdrop-blur-xl
+  - tracking-tight title
+
+- Polished **audience joker modal**:
+  - Letter badges in bordered rounded-md boxes (monospace font)
+  - Bar fills with gradient (rgba(106,122,154,0.6) → rgba(160,170,200,0.8))
+  - Bar containers with border + bg-bg2/20
+  - Percentage in tabular-nums
+  - backdrop-blur-xl
+
+- Polished **phone joker modal**:
+  - Lumi in bordered box
+  - Suggestion shown in bordered pill
+  - backdrop-blur-xl
+  - tracking-tight title
+
+- Polished **reveal card**:
+  - Gradient background (mint or coral, very subtle 8% opacity)
+  - Border + box-shadow glow
+  - Icon in bordered box (not raw icon)
+  - Explanation separated by border-t
+  - tracking-tight title
+  - leading-relaxed text
+
+- Verified with Agent Browser:
+  - Landing → login → game stage works
+  - Premium ladder renders (rail variant with diamond bullets + active gradient)
+  - Question + answer plates + jokers render
+  - Answer → Final → reveal works (gradient reveal card with icon box)
+  - Audience joker modal renders (gradient bars, bordered letters)
+  - Lint: 0 errors, 0 warnings
+  - Server: HTTP 200
+
+Stage Summary:
+- Taler-Leiter completely redesigned with premium Millionaire-inspired styling
+- All dialogs/modals (final-answer, walk-away, audience, phone) polished with backdrop-blur, bordered pills, neutral palette
+- Reveal card redesigned with gradient + glow + icon box
+- Consistent design language: borders, backdrop-blur, tracking-tight, monospace for numbers, pill-style highlights
