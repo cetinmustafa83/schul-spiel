@@ -1,35 +1,34 @@
 "use client";
 
 import * as THREE from "three";
-import { Canvas, useFrame } from "@react-three/fiber";
-import { Environment } from "@react-three/drei";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Environment, Stars } from "@react-three/drei";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { useEffect, useRef, useMemo, Suspense } from "react";
-import type { Mesh, MeshStandardMaterial, PerspectiveCamera } from "three";
+import type { Mesh, Group } from "three";
 
 /**
- * Wissensgipfel — Professional 3D "Twilight Summit" scene.
+ * Wissensgipfel — Cinematic "Twilight Summit" scene.
  *
- * Built following the threejs-aaa-graphics-builder methodology:
- *   1. PBR render pipeline (env map, ACES tone mapping, sRGB)
- *   2. Authored geometry (custom BufferGeometry mountains, not cones)
- *   3. Material library (snow, rock, emissive beacon)
- *   4. Lighting rig (key/fill/rim/practical)
- *   5. Shader effects (fresnel rim on crystals, scrolling emissive on beacons)
- *   6. Post-processing (bloom, vignette, OutputPass)
- *   7. Gradient sky dome
+ * Neutral, sophisticated aesthetic — not childish. Inspired by:
+ *   - Atmospheric mountain films (The Revenant, Lord of the Rings)
+ *   - Architectural visualization lighting
+ *   - AAA game environment art (Horizon Zero Dawn, Death Stranding)
+ *
+ * Palette: deep twilight blues, muted purples, subtle warm rim.
+ * No cartoony beams or saturated colors.
  */
 
 // ============================================================================
-// Post-processing — bloom + vignette + output
+// Post-Processing — cinematic bloom + vignette + color grade
 // ============================================================================
 
 function PostProcessing() {
-  const { gl, scene, camera, size } = useThreeState();
+  const { gl, scene, camera, size } = useThree();
   const composerRef = useRef<EffectComposer | null>(null);
 
   useEffect(() => {
@@ -39,28 +38,47 @@ function PostProcessing() {
 
     composer.addPass(new RenderPass(scene, camera));
 
+    // Subtle bloom — only on emissive highlights
     const bloom = new UnrealBloomPass(
       new THREE.Vector2(size.width, size.height),
-      0.5, 0.35, 0.85
+      0.35,  // strength — subtle
+      0.4,   // radius
+      0.9    // threshold — only brightest
     );
     composer.addPass(bloom);
 
-    const vignetteShader = {
+    // Cinematic vignette + color grade
+    const cinematicShader = {
       uniforms: {
         tDiffuse: { value: null },
-        uStrength: { value: 0.85 },
-        uSize: { value: 0.72 },
+        uVignette: { value: 0.9 },
+        uVignetteSize: { value: 0.65 },
+        uContrast: { value: 1.08 },
+        uSaturation: { value: 0.85 }, // desaturate slightly for cinematic feel
+        uTint: { value: new THREE.Color(0x1a1a2e) },
+        uTintAmount: { value: 0.12 },
       },
       vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-      fragmentShader: `uniform sampler2D tDiffuse; uniform float uStrength, uSize; varying vec2 vUv;
+      fragmentShader: `uniform sampler2D tDiffuse;
+        uniform float uVignette, uVignetteSize, uContrast, uSaturation, uTintAmount;
+        uniform vec3 uTint;
+        varying vec2 vUv;
         void main(){
           vec4 c = texture2D(tDiffuse, vUv);
+          // Vignette
           float d = distance(vUv, vec2(0.5));
-          c.rgb *= mix(1.0, smoothstep(uSize, uSize - 0.45, d), uStrength);
+          c.rgb *= mix(1.0, smoothstep(uVignetteSize, uVignetteSize - 0.5, d), uVignette);
+          // Contrast
+          c.rgb = (c.rgb - 0.5) * uContrast + 0.5;
+          // Desaturate (luminance blend)
+          float lum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+          c.rgb = mix(vec3(lum), c.rgb, uSaturation);
+          // Subtle cool tint
+          c.rgb = mix(c.rgb, c.rgb * uTint, uTintAmount);
           gl_FragColor = c;
         }`,
     };
-    composer.addPass(new ShaderPass(vignetteShader));
+    composer.addPass(new ShaderPass(cinematicShader));
     composer.addPass(new OutputPass());
 
     composerRef.current = composer;
@@ -74,23 +92,17 @@ function PostProcessing() {
   return null;
 }
 
-// Helper to get three state without triggering immutability lint
-function useThreeState() {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { useThree } = require("@react-three/fiber") as typeof import("@react-three/fiber");
-  return useThree();
-}
-
 // ============================================================================
-// Gradient Sky Dome
+// Atmospheric Sky — muted twilight gradient
 // ============================================================================
 
-function GradientSky() {
+function AtmosphericSky() {
   const skyUniforms = useMemo(() => ({
-    uTop:      { value: new THREE.Color(0x1a0f3d) },
-    uHorizon:  { value: new THREE.Color(0x2a1f5d) },
-    uSunColor: { value: new THREE.Color(0xffc83d) },
-    uSunDir:   { value: new THREE.Vector3(0.4, 0.28, 0.6).normalize() },
+    uTop:      { value: new THREE.Color(0x0a0e1a) },      // deep navy
+    uHorizon:  { value: new THREE.Color(0x1e1b3a) },      // muted purple
+    uBottom:   { value: new THREE.Color(0x0d0a1f) },      // dark violet
+    uSunColor: { value: new THREE.Color(0x4a5568) },      // muted warm grey (not bright yellow)
+    uSunDir:   { value: new THREE.Vector3(0.3, 0.15, 0.6).normalize() },
   }), []);
 
   return (
@@ -103,12 +115,18 @@ function GradientSky() {
         vertexShader={`varying vec3 vDir;
           void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`}
         fragmentShader={`varying vec3 vDir;
-          uniform vec3 uTop, uHorizon, uSunColor, uSunDir;
+          uniform vec3 uTop, uHorizon, uBottom, uSunColor, uSunDir;
           void main(){
             float h = clamp(vDir.y * 0.5 + 0.5, 0.0, 1.0);
-            vec3 col = mix(uHorizon, uTop, pow(h, 0.6));
+            vec3 col;
+            if (h > 0.5) {
+              col = mix(uHorizon, uTop, pow((h - 0.5) * 2.0, 0.7));
+            } else {
+              col = mix(uBottom, uHorizon, pow(h * 2.0, 0.8));
+            }
+            // Subtle sun glow (not a disc — atmospheric scatter)
             float d = clamp(dot(normalize(vDir), normalize(uSunDir)), 0.0, 1.0);
-            col += uSunColor * (pow(d, 800.0) + pow(d, 8.0) * 0.25);
+            col += uSunColor * pow(d, 4.0) * 0.15;
             gl_FragColor = vec4(col, 1.0);
           }`}
       />
@@ -117,220 +135,365 @@ function GradientSky() {
 }
 
 // ============================================================================
-// Authored Mountain Range — custom BufferGeometry
+// Realistic Mountain Range — layered, atmospheric, with snow
 // ============================================================================
 
-function MountainRange() {
-  const { farGeometry, nearGeometry } = useMemo(() => {
-    const buildRidge = (peaks: Array<{x: number, h: number, w: number}>, segments: number, darkColor: [number, number, number]) => {
-      const verts: number[] = [];
-      const colors: number[] = [];
-      for (const p of peaks) {
-        for (let i = 0; i < segments; i++) {
-          const a1 = (i / segments) * Math.PI - Math.PI / 2;
-          const a2 = ((i + 1) / segments) * Math.PI - Math.PI / 2;
-          const x1b = p.x + Math.cos(a1) * p.w;
-          const z1b = Math.sin(a1) * p.w;
-          const x2b = p.x + Math.cos(a2) * p.w;
-          const z2b = Math.sin(a2) * p.w;
-          verts.push(x1b, 0, z1b, x2b, 0, z2b, p.x, p.h, 0);
-          for (let v = 0; v < 3; v++) {
-            const y = v === 2 ? p.h : 0;
-            if (y > p.h * 0.7) {
-              colors.push(0.96, 0.95, 1.0);
-            } else if (y > p.h * 0.4) {
-              colors.push(darkColor[0] * 1.5, darkColor[1] * 1.5, darkColor[2] * 1.5);
-            } else {
-              colors.push(...darkColor);
-            }
+function MountainLayer({ peaks, z, color, snowColor, roughness, segments = 12 }: {
+  peaks: Array<{x: number, h: number, w: number}>;
+  z: number;
+  color: string;
+  snowColor: string;
+  roughness: number;
+  segments?: number;
+}) {
+  const geometry = useMemo(() => {
+    const verts: number[] = [];
+    const colors: number[] = [];
+    const normals: number[] = [];
+
+    for (const p of peaks) {
+      // Build a proper mountain shape with multiple segments
+      for (let i = 0; i < segments; i++) {
+        const a1 = (i / segments) * Math.PI - Math.PI / 2;
+        const a2 = ((i + 1) / segments) * Math.PI - Math.PI / 2;
+
+        // Base ring
+        const x1b = p.x + Math.cos(a1) * p.w;
+        const z1b = Math.sin(a1) * p.w;
+        const x2b = p.x + Math.cos(a2) * p.w;
+        const z2b = Math.sin(a2) * p.w;
+
+        // Mid point (halfway up)
+        const x1m = p.x + Math.cos(a1) * p.w * 0.6;
+        const z1m = Math.sin(a1) * p.w * 0.6;
+        const x2m = p.x + Math.cos(a2) * p.w * 0.6;
+        const z2m = Math.sin(a2) * p.w * 0.6;
+
+        // Peak
+        const xp = p.x;
+        const yp = p.h;
+        const zp = 0;
+
+        // Triangle 1: base1, base2, mid1
+        verts.push(x1b, 0, z1b, x2b, 0, z2b, x1m, p.h * 0.5, z1m);
+        // Triangle 2: base2, mid2, mid1
+        verts.push(x2b, 0, z2b, x2m, p.h * 0.5, z2m, x1m, p.h * 0.5, z1m);
+        // Triangle 3: mid1, mid2, peak
+        verts.push(x1m, p.h * 0.5, z1m, x2m, p.h * 0.5, z2m, xp, yp, zp);
+
+        // Vertex colors — gradient from base (dark) to peak (snow)
+        for (let v = 0; v < 9; v++) {
+          const y = v % 3 === 2 ? yp : (v < 3 ? 0 : p.h * 0.5);
+          const snowLine = p.h * 0.75;
+          const rockLine = p.h * 0.4;
+          if (y > snowLine) {
+            // Snow — bright but not pure white
+            colors.push(0.78, 0.82, 0.88);
+          } else if (y > rockLine) {
+            // Rock — gradient
+            const t = (y - rockLine) / (snowLine - rockLine);
+            colors.push(0.12 + t * 0.08, 0.11 + t * 0.07, 0.16 + t * 0.08);
+          } else {
+            // Dark base
+            colors.push(0.05, 0.045, 0.08);
           }
         }
       }
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
-      geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
-      geo.computeVertexNormals();
-      return geo;
-    };
+    }
 
-    const farGeometry = buildRidge([
-      { x: -8, h: 5, w: 3 },
-      { x: -3, h: 7, w: 3.5 },
-      { x: 2, h: 6, w: 3 },
-      { x: 7, h: 8, w: 4 },
-      { x: 12, h: 5, w: 3 },
-    ], 8, [0.15, 0.13, 0.3]);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+    geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+    geo.computeVertexNormals();
+    return geo;
+  }, [peaks, segments]);
 
-    const nearGeometry = buildRidge([
-      { x: -10, h: 3, w: 4 },
-      { x: -2, h: 4, w: 5 },
-      { x: 8, h: 3.5, w: 4 },
-      { x: 15, h: 3, w: 4 },
-    ], 6, [0.08, 0.07, 0.18]);
+  return (
+    <mesh geometry={geometry} position={[0, -2, z]}>
+      <meshStandardMaterial
+        vertexColors
+        roughness={roughness}
+        metalness={0.05}
+        flatShading
+        envMapIntensity={0.5}
+      />
+    </mesh>
+  );
+}
 
-    return { farGeometry, nearGeometry };
-  }, []);
-
+function MountainRange() {
   return (
     <group>
-      <mesh geometry={farGeometry} position={[0, -2, -12]}>
-        <meshStandardMaterial vertexColors roughness={0.85} metalness={0.1} flatShading envMapIntensity={0.6} />
-      </mesh>
-      <mesh geometry={nearGeometry} position={[0, -2.5, -6]}>
-        <meshStandardMaterial vertexColors roughness={0.92} metalness={0.05} flatShading envMapIntensity={0.4} />
-      </mesh>
+      {/* Far ridge — atmospheric, hazy */}
+      <MountainLayer
+        peaks={[
+          { x: -12, h: 6, w: 4 },
+          { x: -5, h: 8, w: 4.5 },
+          { x: 2, h: 7, w: 4 },
+          { x: 9, h: 9, w: 5 },
+          { x: 16, h: 6, w: 4 },
+        ]}
+        z={-14}
+        color="#1a1a2e"
+        snowColor="#7a8090"
+        roughness={0.95}
+        segments={14}
+      />
+      {/* Mid ridge */}
+      <MountainLayer
+        peaks={[
+          { x: -8, h: 4, w: 4.5 },
+          { x: 0, h: 5, w: 5 },
+          { x: 8, h: 4.5, w: 4.5 },
+        ]}
+        z={-8}
+        color="#0d0d1a"
+        snowColor="#5a6070"
+        roughness={0.98}
+        segments={10}
+      />
+      {/* Near ridge — dark silhouettes */}
+      <MountainLayer
+        peaks={[
+          { x: -10, h: 2.5, w: 5 },
+          { x: -2, h: 3, w: 6 },
+          { x: 8, h: 2.8, w: 5 },
+          { x: 16, h: 2.5, w: 5 },
+        ]}
+        z={-3}
+        color="#050510"
+        snowColor="#3a3a4a"
+        roughness={1.0}
+        segments={8}
+      />
     </group>
   );
 }
 
 // ============================================================================
-// Summit Beacon — emissive with pulsing shader
+// Atmospheric Fog — volumetric depth
 // ============================================================================
 
-function SummitBeacon() {
-  const beaconRef = useRef<Mesh>(null);
-  const glowRef = useRef<Mesh>(null);
-  const beamRef = useRef<Mesh>(null);
-  const shaderTimeRef = useRef(0);
-
-  const beaconMaterial = useMemo(() => {
-    const mat = new THREE.MeshStandardMaterial({
-      color: 0x101010,
-      emissive: 0xffc83d,
-      emissiveIntensity: 2.5,
-      metalness: 0.0,
-      roughness: 0.4,
-    });
-    mat.onBeforeCompile = (shader) => {
-      shader.uniforms.uTime = { value: 0 };
-      (mat as unknown as { userData: Record<string, unknown> }).userData.shader = shader;
-      shader.fragmentShader =
-        "uniform float uTime;\n" +
-        shader.fragmentShader.replace(
-          "#include <emissivemap_fragment>",
-          `#include <emissivemap_fragment>
-           float pulse = 0.7 + 0.3 * sin(uTime * 2.0);
-           totalEmissiveRadiance *= pulse;`
-        );
-    };
-    mat.customProgramCacheKey = () => "beacon-pulse";
-    return mat;
-  }, []);
-
+function AtmosphericFog() {
+  const fogRef = useRef<Mesh>(null);
   useFrame((state) => {
+    if (!fogRef.current) return;
     const t = state.clock.elapsedTime;
-    shaderTimeRef.current = t;
-    const pulse = 1 + Math.sin(t * 2) * 0.15;
-    if (beaconRef.current) beaconRef.current.scale.setScalar(pulse);
-    if (glowRef.current) {
-      glowRef.current.scale.setScalar(1 + Math.sin(t * 1.5) * 0.3);
-      glowRef.current.rotation.y = t * 0.3;
-    }
-    if (beamRef.current) beamRef.current.rotation.y = t * 0.5;
+    fogRef.current.position.x = Math.sin(t * 0.1) * 2;
   });
 
   return (
-    <group position={[0, 3.5, -10]}>
-      <mesh ref={beaconRef} material={beaconMaterial}>
-        <sphereGeometry args={[0.3, 16, 16]} />
-      </mesh>
-      <mesh ref={glowRef}>
-        <sphereGeometry args={[0.7, 16, 16]} />
-        <meshBasicMaterial color={0xffc83d} transparent opacity={0.18} />
-      </mesh>
-      <mesh ref={beamRef} position={[0, 2, 0]}>
-        <cylinderGeometry args={[0.05, 0.15, 4, 8, 1, true]} />
-        <meshBasicMaterial color={0xffc83d} transparent opacity={0.3} side={THREE.DoubleSide} depthWrite={false} />
-      </mesh>
-      <mesh position={[0, 1, 0]}>
-        <cylinderGeometry args={[0.02, 0.02, 2, 6]} />
-        <meshStandardMaterial color={0x3d2f8f} metalness={0.8} roughness={0.3} />
-      </mesh>
-      <mesh position={[0.3, 2.3, 0]}>
-        <boxGeometry args={[0.5, 0.3, 0.02]} />
-        <meshStandardMaterial color={0xffc83d} emissive={0xe59a00} emissiveIntensity={0.6} />
-      </mesh>
-      <pointLight color={0xffc83d} intensity={2} distance={8} />
-    </group>
-  );
-}
-
-// ============================================================================
-// Floating Crystals — Fresnel rim glow shader
-// ============================================================================
-
-function Crystal({ position, color, speed = 1 }: { position: [number, number, number]; color: string; speed?: number }) {
-  const meshRef = useRef<Mesh>(null);
-  const material = useMemo(() => {
-    const mat = new THREE.MeshPhysicalMaterial({
-      color: new THREE.Color(color),
-      metalness: 0.2,
-      roughness: 0.1,
-      transmission: 0.6,
-      thickness: 0.5,
-      ior: 1.5,
-      envMapIntensity: 1.5,
-      emissive: new THREE.Color(color),
-      emissiveIntensity: 0.3,
-    });
-    mat.onBeforeCompile = (shader) => {
-      shader.uniforms.uRimColor = { value: new THREE.Color(color) };
-      shader.uniforms.uRimPower = { value: 3.0 };
-      shader.uniforms.uRimStrength = { value: 1.5 };
-      shader.fragmentShader =
-        "uniform vec3 uRimColor;\nuniform float uRimPower;\nuniform float uRimStrength;\n" +
-        shader.fragmentShader.replace(
-          "#include <emissivemap_fragment>",
-          `#include <emissivemap_fragment>
-           float fres = pow(1.0 - saturate(dot(normalize(vNormal), normalize(vViewPosition))), uRimPower);
-           totalEmissiveRadiance += uRimColor * fres * uRimStrength;`
-        );
-    };
-    mat.customProgramCacheKey = () => "crystal-fresnel";
-    return mat;
-  }, [color]);
-
-  useFrame((state) => {
-    if (!meshRef.current) return;
-    const t = state.clock.elapsedTime * speed;
-    meshRef.current.rotation.y = t * 0.5;
-    meshRef.current.rotation.x = t * 0.3;
-    meshRef.current.position.y = position[1] + Math.sin(t) * 0.3;
-  });
-
-  return (
-    <mesh ref={meshRef} position={position} material={material}>
-      <octahedronGeometry args={[0.35, 0]} />
+    <mesh ref={fogRef} position={[0, 1, -6]}>
+      <planeGeometry args={[40, 8]} />
+      <meshBasicMaterial
+        color={0x1a1a2e}
+        transparent
+        opacity={0.3}
+        depthWrite={false}
+        side={THREE.DoubleSide}
+      />
     </mesh>
   );
 }
 
 // ============================================================================
-// Lighting Rig
+// Volumetric God Rays — subtle, atmospheric (NOT a beam cylinder)
 // ============================================================================
 
-function LightingRig() {
+function GodRays() {
+  const groupRef = useRef<Group>(null);
+
+  // Create subtle light shafts using planes with gradient shader
+  const rayMaterial = useMemo(() => {
+    return new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      uniforms: {
+        uTime: { value: 0 },
+        uColor: { value: new THREE.Color(0x3a4055) }, // muted warm grey
+        uOpacity: { value: 0.15 },
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float uTime;
+        uniform vec3 uColor;
+        uniform float uOpacity;
+        varying vec2 vUv;
+        void main() {
+          // Vertical gradient — brighter at top, fades down
+          float vertical = smoothstep(0.0, 0.3, vUv.y) * smoothstep(1.0, 0.7, vUv.y);
+          // Horizontal soft edges
+          float horizontal = smoothstep(0.0, 0.3, vUv.x) * smoothstep(1.0, 0.7, vUv.x);
+          // Subtle shimmer
+          float shimmer = 0.9 + 0.1 * sin(uTime * 0.5 + vUv.y * 4.0);
+          float alpha = vertical * horizontal * uOpacity * shimmer;
+          gl_FragColor = vec4(uColor, alpha);
+        }
+      `,
+    });
+  }, []);
+
+  useFrame((state) => {
+    godRayShaderUpdate(groupRef, state.clock.elapsedTime);
+  });
+
+  return (
+    <group ref={groupRef} position={[2, 6, -12]}>
+      {/* 3 subtle light shafts at different angles */}
+      <mesh material={rayMaterial} position={[0, 0, 0]} rotation={[0, 0, 0.1]}>
+        <planeGeometry args={[1.5, 12, 1, 1]} />
+      </mesh>
+      <mesh material={rayMaterial} position={[1.5, 0, 0]} rotation={[0, 0, -0.05]}>
+        <planeGeometry args={[1.2, 10, 1, 1]} />
+      </mesh>
+      <mesh material={rayMaterial} position={[-1.2, 0, 0]} rotation={[0, 0, 0.15]}>
+        <planeGeometry args={[1.3, 11, 1, 1]} />
+      </mesh>
+    </group>
+  );
+}
+
+function godRayShaderUpdate(groupRef: React.RefObject<Group | null>, time: number) {
+  if (!groupRef.current) return;
+  groupRef.current.children.forEach((child) => {
+    const mesh = child as Mesh;
+    const mat = mesh.material as THREE.ShaderMaterial;
+    if (mat && mat.uniforms && mat.uniforms.uTime) {
+      mat.uniforms.uTime.value = time;
+    }
+  });
+}
+
+// ============================================================================
+// Summit Glow — subtle, atmospheric (NOT a beacon)
+// ============================================================================
+
+function SummitGlow() {
+  const glowRef = useRef<Mesh>(null);
+  useFrame((state) => {
+    if (!glowRef.current) return;
+    const t = state.clock.elapsedTime;
+    const pulse = 1 + Math.sin(t * 0.8) * 0.1;
+    glowRef.current.scale.setScalar(pulse);
+    glowRef.current.rotation.y = t * 0.1;
+  });
+
+  return (
+    <group position={[9, 5, -14]}>
+      {/* Subtle glow sphere — atmospheric, not a beacon */}
+      <mesh ref={glowRef}>
+        <sphereGeometry args={[1.5, 16, 16]} />
+        <meshBasicMaterial
+          color={0x4a5568}
+          transparent
+          opacity={0.08}
+          depthWrite={false}
+        />
+      </mesh>
+      {/* Practical light — subtle warm */}
+      <pointLight color={0x6a7a90} intensity={0.5} distance={12} />
+    </group>
+  );
+}
+
+// ============================================================================
+// Drifting Particles — subtle atmospheric dust (not cartoony)
+// ============================================================================
+
+function AtmosphericParticles({ count = 80 }: { count?: number }) {
+  const pointsRef = useRef<THREE.Points>(null);
+
+  const { positions, sizes } = useMemo(() => {
+    const positions = new Float32Array(count * 3);
+    const sizes = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+      positions[i * 3] = (Math.random() - 0.5) * 30;
+      positions[i * 3 + 1] = Math.random() * 10;
+      positions[i * 3 + 2] = -Math.random() * 15 - 2;
+      sizes[i] = Math.random() * 0.05 + 0.02;
+    }
+    return { positions, sizes };
+  }, [count]);
+
+  useFrame((state) => {
+    if (!pointsRef.current) return;
+    const t = state.clock.elapsedTime;
+    const positions = pointsRef.current.geometry.attributes.position.array as Float32Array;
+    for (let i = 0; i < count; i++) {
+      positions[i * 3] += Math.sin(t * 0.2 + i) * 0.002;
+      positions[i * 3 + 1] += Math.sin(t * 0.3 + i * 0.5) * 0.003 - 0.005;
+      if (positions[i * 3 + 1] < 0) positions[i * 3 + 1] = 10;
+    }
+    pointsRef.current.geometry.attributes.position.needsUpdate = true;
+  });
+
+  return (
+    <points ref={pointsRef}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+        <bufferAttribute attach="attributes-size" args={[sizes, 1]} />
+      </bufferGeometry>
+      <pointsMaterial
+        size={0.08}
+        color={0x8a8aa0}
+        transparent
+        opacity={0.4}
+        sizeAttenuation
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+      />
+    </points>
+  );
+}
+
+// ============================================================================
+// Lighting Rig — cinematic, moody
+// ============================================================================
+
+function CinematicLighting() {
   return (
     <>
-      <ambientLight intensity={0.15} color={0x8b6cff} />
-      <directionalLight position={[8, 12, 4]} intensity={0.8} color={0xffc83d} />
-      <directionalLight position={[-6, 4, -4]} intensity={0.3} color={0x5cc8ff} />
-      <directionalLight position={[0, 6, -10]} intensity={0.4} color={0x8b6cff} />
+      {/* Low ambient — moody */}
+      <ambientLight intensity={0.08} color={0x3a4055} />
+      {/* Key light — cool, from the side (moonlight feel) */}
+      <directionalLight
+        position={[-8, 10, 2]}
+        intensity={0.4}
+        color={0x6a7a9a}
+      />
+      {/* Rim light — subtle warm, behind (sunset glow) */}
+      <directionalLight
+        position={[8, 4, -10]}
+        intensity={0.25}
+        color={0x8a7a6a}
+      />
+      {/* Fill — very subtle, cool */}
+      <hemisphereLight args={[0x2a2a4a, 0x0a0a14, 0.15]} />
     </>
   );
 }
 
 // ============================================================================
-// Camera rig — slow orbit
+// Camera rig — slow, smooth dolly
 // ============================================================================
 
-function CameraRig({ reducedMotion }: { reducedMotion: boolean }) {
+function CinematicCamera({ reducedMotion }: { reducedMotion: boolean }) {
   useFrame((state) => {
     if (reducedMotion) return;
-    const t = state.clock.elapsedTime * 0.06;
-    state.camera.position.x = Math.sin(t) * 2;
-    state.camera.position.y = 0.8 + Math.sin(t * 0.7) * 0.4;
-    state.camera.lookAt(0, 1, -8);
+    const t = state.clock.elapsedTime * 0.03;
+    // Very slow, smooth dolly — no fast motion
+    state.camera.position.x = Math.sin(t) * 1.2;
+    state.camera.position.y = 1.2 + Math.sin(t * 0.5) * 0.2;
+    state.camera.position.z = 4 + Math.cos(t * 0.3) * 0.5;
+    state.camera.lookAt(0, 2, -10);
   });
   return null;
 }
@@ -342,20 +505,26 @@ function CameraRig({ reducedMotion }: { reducedMotion: boolean }) {
 function Scene({ reducedMotion }: { reducedMotion: boolean }) {
   return (
     <>
-      <LightingRig />
-      <GradientSky />
+      <CinematicLighting />
+      <AtmosphericSky />
       <Environment preset="night" />
       <MountainRange />
-      <SummitBeacon />
+      <AtmosphericFog />
+      <GodRays />
+      <SummitGlow />
+      {!reducedMotion && <AtmosphericParticles count={60} />}
       {!reducedMotion && (
-        <>
-          <Crystal position={[-3, 2, -7]} color="#8B6CFF" speed={0.8} />
-          <Crystal position={[3, 2.5, -8]} color="#5CC8FF" speed={1.1} />
-          <Crystal position={[-1.5, 3.5, -9]} color="#3DDBA4" speed={0.6} />
-          <Crystal position={[2, 1.5, -6]} color="#FFC83D" speed={0.9} />
-        </>
+        <Stars
+          radius={100}
+          depth={50}
+          count={800}
+          factor={4}
+          saturation={0}
+          fade
+          speed={reducedMotion ? 0 : 0.3}
+        />
       )}
-      {!reducedMotion && <CameraRig reducedMotion={reducedMotion} />}
+      {!reducedMotion && <CinematicCamera reducedMotion={reducedMotion} />}
     </>
   );
 }
@@ -373,9 +542,16 @@ export function MountainScene3D({ className, reducedMotion = false }: MountainSc
   return (
     <div className={className} aria-hidden="true">
       <Canvas
-        camera={{ position: [0, 1, 4], fov: 50 }}
+        camera={{ position: [0, 1.2, 4], fov: 45 }}
         dpr={[1, 1.5]}
-        gl={{ antialias: true, alpha: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0, outputColorSpace: THREE.SRGBColorSpace }}
+        gl={{
+          antialias: true,
+          alpha: true,
+          powerPreference: "high-performance",
+          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: 0.95,
+          outputColorSpace: THREE.SRGBColorSpace,
+        }}
         style={{ background: "transparent" }}
       >
         <Suspense fallback={null}>
@@ -386,5 +562,3 @@ export function MountainScene3D({ className, reducedMotion = false }: MountainSc
     </div>
   );
 }
-
-export type { PerspectiveCamera };

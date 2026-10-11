@@ -28,7 +28,7 @@ interface ParticleFieldProps {
   type?: "embers" | "dust" | "fireflies" | "snow";
 }
 
-const DEFAULT_COLORS = ["#FFC83D", "#8B6CFF", "#5CC8FF", "#3DDBA4"];
+const DEFAULT_COLORS = ["#6a7a9a", "#8a8aa0", "#4a5568"];
 
 /**
  * Ambient particle field — floating embers/dust/fireflies.

@@ -39,7 +39,9 @@ export function HomeScreen() {
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col px-4 py-6 sm:px-6">
       <header className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="text-3xl" aria-hidden>🏔️</span>
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-bg2/40">
+            <Trophy className="h-5 w-5 text-gold/80" />
+          </div>
           <div>
             <div className="font-display text-xl font-bold text-ink">
               Hallo, {player?.displayName}!

@@ -111,7 +111,7 @@ export default function Page() {
 
   return (
     <main className="relative min-h-screen">
-      <AnimatedBackground reducedMotion={prefs.reducedMotion} particles particleType="embers" particleCount={30} />
+      <AnimatedBackground reducedMotion={prefs.reducedMotion} particles particleType="dust" particleCount={20} />
       <div className="relative z-10">
         <Screen />
       </div>

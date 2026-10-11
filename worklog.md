@@ -450,3 +450,73 @@ Stage Summary:
 - Game-feel system implements trauma-based shake, hitstop, squash-stretch, FOV punch, impact flash — the same techniques used in the threejs-game-skills reference demos.
 - All animations degrade gracefully with reduced-motion preference.
 - Performance: DPR capped, single draw call per layer, instanced-ready, canvas particles.
+
+
+---
+Task ID: 14
+Agent: orchestrator (GLM Code) — neutral, cinematic redesign
+Task: Remove childish/ugly elements (beacon beam, saturated colors, emoji), redesign for universal/neutral appeal
+
+Work Log:
+- User feedback: "yukardan asagi sarkan sari, turuncu gibi duran sey belirgin degil cok cirkin duran bisey" (the yellow/orange thing hanging from top to bottom is not prominent and looks very ugly) + "cocuksu degil, ukula uygun dizayn ve animasyonlar kullan yani neutral olmaliyiz" (not childish, use design and animations appropriate for everyone, i.e. neutral)
+- Removed the ugly beacon beam cylinder entirely
+- Completely rebuilt the 3D scene with a cinematic, neutral aesthetic:
+
+1. **Removed childish elements**:
+   - No more beacon beam cylinder (the ugly yellow thing)
+   - No more Lumi owl mascot on landing (was childish)
+   - No more 🏔️ emoji on landing
+   - No more 🦉🎯🛡️ emojis on feature cards — replaced with geometric icons (◆ ▲ ●)
+   - No more 🏔️ emoji on home header — replaced with Trophy icon
+   - Removed saturated gold/mint/coral colors from particles
+   - Particle colors changed to muted greys (#6a7a9a, #8a8aa0, #4a5568)
+
+2. **Cinematic 3D scene** (mountain-scene.tsx):
+   - **Atmospheric sky**: muted twilight gradient (deep navy → muted purple → dark violet), subtle atmospheric sun scatter (not a bright disc)
+   - **Realistic mountains**: 3-layer range with proper BufferGeometry (base → mid → peak), vertex-color gradients (dark base → rock → muted snow), flatShading for low-poly aesthetic
+   - **Atmospheric fog**: drifting fog plane for depth
+   - **Volumetric god rays**: 3 subtle light shafts with custom shader (additive blending, shimmer) — NOT a cylinder beam
+   - **Summit glow**: subtle atmospheric sphere with very low opacity (0.08) — not a beacon
+   - **Atmospheric particles**: 60 drifting dust motes (muted grey, additive blending)
+   - **Cinematic lighting**: low ambient (0.08), cool key light (moonlight), subtle warm rim, hemisphere fill
+   - **Cinematic camera**: very slow dolly (0.03 speed), subtle vertical bob
+
+3. **Cinematic post-processing**:
+   - Subtle bloom (strength 0.35, threshold 0.9 — only brightest)
+   - Cinematic vignette (0.9 strength, 0.65 size)
+   - Contrast boost (1.08)
+   - Desaturation (0.85 — cinematic feel)
+   - Cool tint (0x1a1a2e, 0.12 amount)
+   - OutputPass last
+
+4. **Neutral landing screen**:
+   - Clean typographic hierarchy (tracking-tight, uppercase subtitle)
+   - No mascot, no emoji
+   - Geometric feature card icons (◆ ▲ ●)
+   - Refined borders (rounded-xl, backdrop-blur-md)
+   - Subtle title glow (muted grey, not gold)
+
+5. **Neutral home screen**:
+   - Trophy icon in bordered box (instead of 🏔️ emoji)
+   - Muted color accents
+
+6. **Neutral ambient background**:
+   - Particle type changed from "embers" (bright rising) to "dust" (subtle drift)
+   - Count reduced from 30 to 20
+   - Colors muted to greys
+
+- Verified with Agent Browser:
+  - Landing renders with cinematic 3D scene — no errors
+  - Login → Home → Game setup → Game stage works
+  - Question + answer plates + jokers + ladder all render
+  - Lint: 0 errors, 0 warnings
+  - Server: HTTP 200
+
+Stage Summary:
+- The design is now neutral and sophisticated — appeals to all ages, not just children
+- No more childish elements: no beacon beam, no owl mascot on landing, no emoji icons
+- Cinematic color palette: deep twilight blues, muted purples, subtle warm accents
+- Realistic mountains with proper geometry and material gradients
+- Atmospheric fog + volumetric god rays + drifting dust = depth and mood
+- Cinematic post-processing: bloom + vignette + contrast + desaturation + cool tint
+- All animations preserved (game-feel system intact)
