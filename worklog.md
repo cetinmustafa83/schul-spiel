@@ -762,3 +762,69 @@ Stage Summary:
 - All effects use the classic feGaussianBlur + feColorMatrix technique
 - prefers-reduced-motion fully supported
 - Neutral muted color palette maintained
+
+
+---
+Task ID: 19
+Agent: orchestrator (GLM Code) — modernize game-setup screen
+Task: Modernize the "Spiel einrichten" (game setup) screen with premium layout
+
+Work Log:
+- User shared the current game-setup screen content and asked to modernize it
+- Completely rewrote `src/components/screens/game-setup.tsx` with a modern, premium design:
+
+  **Layout changes**:
+  - Widened max-width from 4xl → 5xl for more breathing room
+  - Two-column hero header: player card (left) + summit target card (right)
+  - Sticky sidebar ladder on desktop (lg:sticky lg:top-6)
+  - Sticky footer with start button
+
+  **Hero header**:
+  - Player card: gradient background, Trophy icon in bordered box, displayName + #tag with monospace tag, school type + grade
+  - Summit target card: separate gradient card with glow, "Gipfel" label, large tabular-nums amount, "Taler Spielgeld" subtitle
+
+  **Top bar**:
+  - Back button in bordered pill (not bare text)
+  - Status indicator: "Bereit zum Start" with pulsing mint dot
+
+  **Info banner**:
+  - Left-border accent (3px solid muted)
+  - Info icon + "Wiederholung + aktueller Stoff" title + description
+
+  **Jokers section**:
+  - Section header: "DEINE JOKER" uppercase tracking-wider + "je 1× pro Spiel" hint
+  - 2-column grid of premium cards
+  - Each card: bordered icon box (hover changes icon color), label, description
+  - Hover: border + background transitions
+
+  **Timer section**:
+  - Section header: "TIMER" uppercase + "optional" hint
+  - 3-column segmented control
+  - Active state: border + glow shadow + inset shadow
+  - Each option: Timer icon + label + seconds/desc
+
+  **Ladder sidebar**:
+  - Premium gradient card with glow
+  - "TALER-LEITER" header + "15 Stufen" hint
+  - LadderRail component (already premium from previous task)
+
+  **Footer**:
+  - Sticky, full-width with blur
+  - Left: "Ziel" label + target amount (hidden on mobile)
+  - Right: GooeyButton with liquid blob hover effect + ChevronRight icon
+
+- Verified with Agent Browser:
+  - Login → Home → "Spiel starten" → game-setup renders
+  - Player card, summit target, jokers grid, timer, ladder all visible
+  - No errors
+  - Lint: 0 errors, 0 warnings
+  - Server: HTTP 200
+
+Stage Summary:
+- Game-setup screen completely modernized with premium layout
+- Two-column hero header (player + summit target)
+- Premium joker cards with bordered icon boxes
+- Segmented timer control with active glow
+- Sticky sidebar ladder with gradient card
+- GooeyButton start button with liquid blob hover
+- Consistent with the neutral/cinematic design language
