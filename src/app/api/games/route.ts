@@ -39,9 +39,23 @@ export async function POST(req: Request): Promise<NextResponse> {
     }
 
     // Use a synthetic player ID (browser-side player has no server record).
-    // The game/questions are stored server-side for the duration of the game,
-    // but player stats (XP, history, seen) are tracked client-side via LokiJS.
+    // Create a lightweight Player record in DB just for FK constraint.
     const syntheticPlayerId = `browser-${playerNameStr}`;
+    // Ensure a Player row exists (upsert by synthetic ID)
+    await db.player.upsert({
+      where: { id: syntheticPlayerId },
+      update: { lastActiveAt: new Date() },
+      create: {
+        id: syntheticPlayerId,
+        displayName: playerNameStr,
+        tag: "0000",
+        schoolType: schoolTypeStr,
+        grade: gradeNum,
+        pinHash: "$scrypt$00000000000000000000000000000000$0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        rescueHash: "$scrypt$00000000000000000000000000000000$0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        xp: 0,
+      },
+    });
     const track = trackOfSchoolType(schoolTypeStr);
     const ctx: PlayerContext = { playerId: syntheticPlayerId, grade: gradeNum, track };
     const ladder = await getLadder();

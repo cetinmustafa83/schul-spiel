@@ -10,9 +10,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   return catchRoute(async () => {
     const { id } = await params;
     
-    if (!p) return errorResponse("UNAUTHORIZED", 401);
     const game = await db.game.findUnique({ where: { id } });
-    if (!game || game.playerId !== "") return errorResponse("NOT_FOUND", 404);
+    if (!game) return errorResponse("NOT_FOUND", 404);
     if (game.status !== "in_progress") return errorResponse("GAME_OVER", 409, "Dieses Spiel ist bereits beendet.");
     // Walking away is available from level 2 onwards (PRD §5.2).
     if (game.currentLevel < 2) {

@@ -46,13 +46,15 @@ interface RevealData {
   shuffledOptions: string[];
   canonicalOptions: string[];
   topic: { code: string; label: string };
+  questionId?: number;
+  topicId?: number;
 }
 
 const SHAPES = ["▲", "●", "■", "◆"] as const;
 const LETTERS = ["A", "B", "C", "D"] as const;
 
 export function GameStageScreen() {
-  const { payload, navigate, pushToast, prefs } = useApp();
+  const { payload, navigate, pushToast, prefs, player } = useApp();
   const gameId = payload?.gameId as string;
   const initialLadder = (payload?.ladder as LadderStep[]) ?? [];
   const initialJokers = (payload?.jokers as JokerState) ?? { FIFTY_FIFTY: true, AUDIENCE: true, PHONE: true, SWITCH: true };
@@ -127,52 +129,45 @@ export function GameStageScreen() {
         setPhase("asking");
         return;
       }
+      // Set reveal FIRST, then update other state
       setReveal(data.reveal);
-
-      // Browser-side persistence (LokiJS): update XP, seen, review deck, topic mastery, history
-      const playerName = player?.name;
-      if (playerName) {
-        const { updatePlayer, addSeenQuestion, addToReviewDeck, upsertTopicMastery, addGameHistory } = await import("@/lib/browser-db");
-        const isCorrect = data.reveal?.correct === true;
-        // XP
-        const xpGain = isCorrect ? 10 : 1;
-        await updatePlayer(playerName, { xp: (player?.xp ?? 0) + xpGain });
-        useApp.getState().setPlayer({ ...player, xp: (player?.xp ?? 0) + xpGain } as typeof player);
-        // Seen question
-        if (data.reveal?.questionId) {
-          await addSeenQuestion(playerName, data.reveal.questionId);
-        }
-        // Topic mastery
-        if (data.reveal?.topicId != null) {
-          await upsertTopicMastery(playerName, data.reveal.topicId, isCorrect);
-        }
-        // Review deck (wrong answers)
-        if (!isCorrect && data.reveal?.questionId) {
-          await addToReviewDeck(playerName, data.reveal.questionId);
-        }
-      }
-
       if (data.game?.status === "finished") {
-        setWinnings(data.game.winnings);
+        setWinnings(data.game.winnings ?? 0);
         setEndedReason(data.game.reason === "summit_reached" ? "summit_reached" : "wrong_answer");
         setGameFinished(true);
-        // Save to game history
-        if (playerName) {
-          const { addGameHistory } = await import("@/lib/browser-db");
-          await addGameHistory({
-            playerName,
-            mode: "GIPFEL",
-            level: data.game.reason === "summit_reached" ? 15 : level,
-            winnings: data.game.winnings,
-            correct: 0,
-            total: level,
-            date: new Date().toISOString(),
-          });
-        }
-      } else if (data.next) {
+      } else {
         setGameFinished(false);
       }
-    } catch {
+
+      // Browser-side persistence (LokiJS) — fire and forget, completely non-blocking
+      const pName = player?.name;
+      if (pName) {
+        import("@/lib/browser-db").then(async ({ updatePlayer, addSeenQuestion, addToReviewDeck, upsertTopicMastery, addGameHistory }) => {
+          try {
+            const isCorrect = data.reveal?.correct === true;
+            const xpGain = isCorrect ? 10 : 1;
+            await updatePlayer(pName, { xp: (player?.xp ?? 0) + xpGain });
+            if (data.reveal?.questionId) await addSeenQuestion(pName, data.reveal.questionId);
+            if (data.reveal?.topicId != null) await upsertTopicMastery(pName, data.reveal.topicId, isCorrect);
+            if (!isCorrect && data.reveal?.questionId) await addToReviewDeck(pName, data.reveal.questionId);
+            if (data.game?.status === "finished") {
+              await addGameHistory({
+                playerName: pName,
+                mode: "GIPFEL",
+                level: data.game.reason === "summit_reached" ? 15 : level,
+                winnings: data.game.winnings ?? 0,
+                correct: 0,
+                total: level,
+                date: new Date().toISOString(),
+              });
+            }
+          } catch (e) {
+            console.warn("[loki] update error:", e);
+          }
+        }).catch(() => {});
+      }
+    } catch (err) {
+      console.error("[confirmAnswer] error:", err);
       pushToast("Verbindungsfehler.", "error");
       setPhase("asking");
     }

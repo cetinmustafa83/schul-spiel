@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { useApp, type Screen } from "@/lib/store";
 import { LandingScreen } from "@/components/screens/landing";
 import { OnboardingScreen } from "@/components/screens/onboarding";
@@ -14,8 +14,12 @@ import { DailyScreen } from "@/components/screens/daily";
 import { ProfileScreen } from "@/components/screens/profile";
 import { SettingsScreen } from "@/components/screens/settings";
 import { LegalScreen } from "@/components/screens/legal";
-import { AnimatedBackground } from "@/components/three/animated-background";
 import { getDB, getPlayer } from "@/lib/browser-db";
+
+// Lazy-load AnimatedBackground to avoid SSR hydration mismatch
+const AnimatedBackground = lazy(() =>
+  import("@/components/three/animated-background").then((m) => ({ default: m.AnimatedBackground }))
+);
 
 const SCREENS: Record<Screen, React.ComponentType> = {
   landing: LandingScreen,
@@ -36,7 +40,11 @@ const SCREENS: Record<Screen, React.ComponentType> = {
 };
 
 export default function Page() {
-  const { player, loadingPlayer, screen, setPlayer, setLoadingPlayer, navigate, prefs, setPrefs } = useApp();
+  const { player, loadingPlayer, screen, setPlayer, setLoadingPlayer, navigate, prefs } = useApp();
+  const [mounted, setMounted] = useState(false);
+
+  // Prevent SSR rendering of browser-only components
+  useEffect(() => { setMounted(true); }, []);
 
   // Bootstrap — load player from LokiJS (browser localStorage)
   useEffect(() => {
@@ -90,11 +98,10 @@ export default function Page() {
     }
   }, [screen, player, loadingPlayer, navigate]);
 
-  if (loadingPlayer) {
+  if (loadingPlayer || !mounted) {
     return (
-      <main className="relative flex min-h-screen items-center justify-center">
-        <AnimatedBackground reducedMotion={prefs.reducedMotion} particles particleType="dust" particleCount={20} />
-        <div className="relative z-10 flex flex-col items-center gap-4 text-center">
+      <main className="relative flex min-h-screen items-center justify-center bg-bg0">
+        <div className="flex flex-col items-center gap-4 text-center">
           <div className="animate-pulse text-6xl">🏔️</div>
           <p className="font-display text-xl text-ink">Wird geladen …</p>
         </div>
@@ -111,7 +118,9 @@ export default function Page() {
 
   return (
     <main className="relative min-h-screen">
-      <AnimatedBackground reducedMotion={prefs.reducedMotion} particles particleType="dust" particleCount={20} />
+      <Suspense fallback={null}>
+        <AnimatedBackground reducedMotion={prefs.reducedMotion} particles particleType="dust" particleCount={20} />
+      </Suspense>
       <div className="relative z-10">
         <Screen />
       </div>

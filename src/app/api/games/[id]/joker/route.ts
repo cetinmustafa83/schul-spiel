@@ -12,9 +12,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   return catchRoute(async () => {
     const { id } = await params;
     
-    if (!p) return errorResponse("UNAUTHORIZED", 401);
     const game = await db.game.findUnique({ where: { id } });
-    if (!game || game.playerId !== "") return errorResponse("NOT_FOUND", 404);
+    if (!game) return errorResponse("NOT_FOUND", 404);
     if (game.status !== "in_progress") return errorResponse("GAME_OVER", 409, "Dieses Spiel ist bereits beendet.");
 
     const body = await req.json().catch(() => null);
