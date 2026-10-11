@@ -389,7 +389,7 @@ export function GameStageScreen() {
         <aside className="hidden lg:block">
           <div className="sticky top-4 rounded-2xl border border-border bg-bg1/60 p-4">
             <h2 className="mb-3 font-display text-sm font-semibold text-ink">Taler-Leiter</h2>
-            <LadderRail ladder={ladder} currentLevel={level} />
+            <LadderRail ladder={ladder} currentLevel={level} variant="mountain" reducedMotion={prefs.reducedMotion} />
           </div>
         </aside>
 

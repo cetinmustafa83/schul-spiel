@@ -17,6 +17,7 @@ import { DailyScreen } from "@/components/screens/daily";
 import { ProfileScreen } from "@/components/screens/profile";
 import { SettingsScreen } from "@/components/screens/settings";
 import { LegalScreen } from "@/components/screens/legal";
+import { AnimatedBackground } from "@/components/three/animated-background";
 
 const SCREENS: Record<Screen, React.ComponentType> = {
   landing: LandingScreen,
@@ -109,8 +110,8 @@ export default function Page() {
   const Screen = SCREENS[screen] ?? LandingScreen;
 
   return (
-    <main className="starfield relative min-h-screen">
-      <div className="mountains" />
+    <main className="relative min-h-screen">
+      <AnimatedBackground reducedMotion={prefs.reducedMotion} particles particleType="embers" particleCount={30} />
       <div className="relative z-10">
         <Screen />
       </div>
