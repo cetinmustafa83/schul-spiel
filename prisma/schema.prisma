@@ -1,0 +1,351 @@
+// Wissensgipfel — DSGVO-compliant, curriculum-aware quiz-ladder PWA for German school pupils (grades 5-8).
+// All game rules, school types, grades, subjects, topics, jokers, ladder amounts, etc. are DB-driven.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Reference data (all seeded, editable in admin)
+// ---------------------------------------------------------------------------
+
+model SchoolType {
+  code   String @id // HS, RS, SEK, GE, GY
+  label  String
+  track  String // basic | mid | advanced
+  active Int    @default(1)
+  sort   Int    @default(0)
+}
+
+model Grade {
+  grade      Int @id // 4 (basics, not selectable), 5, 6, 7, 8
+  label      String
+  selectable Int @default(1)
+  sort       Int @default(0)
+}
+
+model Subject {
+  id     Int     @id @default(autoincrement())
+  code   String  @unique // DE, MA, EN, BIO, PHY, CH, GE, EK, PW, INF, KU, SP, AW
+  label  String
+  icon   String?
+  color  String?
+  active Int     @default(1)
+  sort   Int     @default(0)
+  topics Topic[]
+  questions Question[]
+}
+
+model Topic {
+  id            Int                 @id @default(autoincrement())
+  subjectId     Int
+  subject       Subject             @relation(fields: [subjectId], references: [id])
+  code          String              @unique
+  label         String
+  curriculumNote String?
+  trackGrades   TopicTrackGrade[]
+  questions     Question[]
+  mastery      TopicMastery[]
+}
+
+model TopicTrackGrade {
+  id         Int    @id @default(autoincrement())
+  topicId    Int
+  track      String // basic | mid | advanced
+  introGrade Int
+  topic      Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([topicId, track])
+}
+
+// ---------------------------------------------------------------------------
+// Game rules (data-driven)
+// ---------------------------------------------------------------------------
+
+model LadderLevel {
+  level   Int    @id // 1..15
+  amount  Int
+  isSafe  Int    @default(0)
+  tier    String // A | B | C
+  label   String?
+}
+
+model SelectionWeight {
+  id       Int     @id @default(autoincrement())
+  tier     String // A | B | C
+  kBucket  String // k0 | k1 | k2plus
+  weight   Float
+  diffMin  Int
+  diffMax  Int
+
+  @@unique([tier, kBucket])
+}
+
+model Setting {
+  key         String @id
+  value       String
+  description String?
+}
+
+model Joker {
+  code       String @id // FIFTY_FIFTY | AUDIENCE | PHONE | SWITCH
+  label      String
+  enabled    Int    @default(1)
+  configJson String?
+}
+
+model Rank {
+  id    Int    @id @default(autoincrement())
+  label String
+  minXp Int
+}
+
+model Badge {
+  id          Int    @id @default(autoincrement())
+  code        String @unique
+  label       String
+  description String
+  ruleJson    String?
+  icon        String?
+  players     PlayerBadge[]
+}
+
+model Phrase {
+  id    Int    @id @default(autoincrement())
+  kind  String // phone_high | phone_low | cheer | encourage | thinking
+  tone  String
+  text  String
+}
+
+model ContentPage {
+  slug       String @id // datenschutz_kids, datenschutz_full, eltern_info, impressum, hilfe
+  title      String
+  bodyMd     String
+  audience   String // kids | parents | all
+  updatedAt  String
+}
+
+model Avatar {
+  id     Int    @id @default(autoincrement())
+  code   String @unique
+  label  String
+  emoji  String
+}
+
+// ---------------------------------------------------------------------------
+// Questions
+// ---------------------------------------------------------------------------
+
+model Question {
+  id            Int      @id @default(autoincrement())
+  topicId       Int
+  topic         Topic   @relation(fields: [topicId], references: [id])
+  subjectId     Int
+  subject       Subject @relation(fields: [subjectId], references: [id])
+  text          String
+  optA          String
+  optB          String
+  optC          String
+  optD          String
+  correctIndex  Int
+  explanation   String
+  difficulty    Int
+  // Per-track introduction grade. NULL = not in that track's curriculum.
+  introGradeHs  Int?
+  introGradeRs  Int?
+  introGradeGy  Int?
+  clusterId      String?
+  sourceNote     String?
+  status         String   @default("published") // draft | auto_checked | in_review | published | rejected | retired
+  createdBy      String   @default("seed")
+  version        Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  gameQuestions  GameQuestion[]
+  reviewDeck     ReviewDeckItem[]
+  reports        QuestionReport[]
+  stats          QuestionStat?
+  seenBy         SeenQuestion[]
+
+  @@index([status, subjectId, difficulty, introGradeGy, introGradeRs, introGradeHs])
+}
+
+model QuestionStat {
+  questionId    Int    @id
+  answered       Int    @default(0)
+  correct        Int    @default(0)
+  optCountsJson  String // {"0":12,"1":4,...}
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
+model QuestionReport {
+  id         Int      @id @default(autoincrement())
+  questionId Int
+  reason     String // unklar | falsch | unpassend
+  createdAt  DateTime @default(now())
+  handled     Int      @default(0)
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------------------------
+// Players (pseudonymous, DSGVO minimal)
+// ---------------------------------------------------------------------------
+
+model Player {
+  id               String   @id @default(cuid())
+  displayName      String
+  tag              String // 4-digit, makes handle unique
+  schoolType       String
+  grade            Int
+  pinHash          String // argon2id-style hash (PBKDF2 fallback for dev)
+  rescueHash       String
+  avatarId         Int?
+  xp               Int      @default(0)
+  prefsJson        String? // sound, music, reducedMotion, textScale, dyslexia, timer
+  leaderboardOptin Int      @default(0)
+  failedLogins     Int      @default(0)
+  lockedUntil      DateTime?
+  createdAt        DateTime @default(now())
+  lastActiveAt     DateTime @default(now())
+
+  sessions         Session[]
+  games            Game[]
+  seenQuestions    SeenQuestion[]
+  reviewDeck       ReviewDeckItem[]
+  badges           PlayerBadge[]
+  topicMastery     TopicMastery[]
+  trainingSessions TrainingSession[]
+  dailyAnswers     DailyAnswer[]
+
+  @@unique([displayName, tag])
+}
+
+model Session {
+  tokenHash String   @id
+  playerId  String
+  expiresAt DateTime
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------------------------
+// Gameplay
+// ---------------------------------------------------------------------------
+
+model Game {
+  id              String   @id @default(cuid())
+  playerId        String
+  mode            String   // GIPFEL | TRAINING | DAILY | REVIEW
+  gradeAtStart    Int
+  track           String
+  currentLevel    Int      @default(1)
+  status          String   @default("in_progress") // in_progress | finished | abandoned
+  winnings        Int      @default(0)
+  jokersJson      String   // {"FIFTY_FIFTY":true,"AUDIENCE":true,...} remaining jokers
+  timerMode       String   @default("off") // off | relaxed | challenge
+  startedAt       DateTime @default(now())
+  endedAt         DateTime?
+
+  player          Player        @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  questions       GameQuestion[]
+
+  @@index([playerId, mode])
+}
+
+model GameQuestion {
+  id            Int      @id @default(autoincrement())
+  gameId         String
+  level          Int
+  questionId     Int
+  optionOrder    String   // JSON array, e.g. "[2,0,3,1]" — store canonical, serve shuffled
+  answeredIndex  Int?     // null until answered
+  correct        Int?
+  jokerUsed      String?
+  answeredAt     DateTime?
+
+  game     Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  question Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, level])
+}
+
+model SeenQuestion {
+  playerId   String
+  questionId Int
+  lastSeenAt DateTime @default(now())
+
+  player   Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, questionId])
+}
+
+model ReviewDeckItem {
+  playerId   String
+  questionId Int
+  box        Int      @default(1) // Leitner 1..4
+  dueAt      DateTime
+  answeredCount Int   @default(0)
+
+  player   Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, questionId])
+}
+
+model PlayerBadge {
+  playerId String
+  badgeId  Int
+  earnedAt DateTime @default(now())
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  badge  Badge  @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, badgeId])
+}
+
+model TopicMastery {
+  playerId String
+  topicId  Int
+  attempts Int @default(0)
+  correct  Int @default(0)
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  topic  Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, topicId])
+}
+
+model TrainingSession {
+  id           String   @id @default(cuid())
+  playerId     String
+  subjectFilter String? // JSON array of subject codes or null for "all"
+  topicFilter  String?
+  length       Int      @default(10)
+  currentIndex Int      @default(0)
+  correctCount Int      @default(0)
+  startedAt    DateTime @default(now())
+  endedAt      DateTime?
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+}
+
+model DailyAnswer {
+  id         Int      @id @default(autoincrement())
+  playerId   String
+  day        String   // YYYY-MM-DD, computed from Berlin time
+  questionId Int
+  correct    Int
+  answeredAt DateTime @default(now())
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, day, questionId])
+}

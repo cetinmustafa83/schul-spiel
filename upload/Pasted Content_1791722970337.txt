@@ -1,0 +1,878 @@
+# MASTER PRD — "Wissensgipfel" (working title)
+
+**A DSGVO-compliant, curriculum-aware quiz-ladder PWA for German school pupils, grades 5–8**
+
+| | |
+|---|---|
+| Version | 1.0 (master) |
+| Date | 2026-10-11 |
+| Owner | DFM Solutions, Oberhausen (NRW) |
+| Status | Ready for phased implementation |
+| Primary build tool | GLM (chat.z.ai) — see Part 15 "GLM Build Playbook" |
+| Documentation language | English. **All end-user UI and all quiz content: German.** |
+
+> **Legal note.** This document describes product and engineering requirements. Items marked ⚖️ need review by a Datenschutzbeauftragter / Fachanwalt before launch. This PRD is not legal advice.
+
+---
+
+## Table of contents
+
+1. Vision, goals, non-goals
+2. Product principles & hard rules
+3. Target users & personas
+4. Brand, IP safety & naming
+5. Game design (rules, ladder, jokers, modes)
+6. Curriculum & question-selection engine (the core logic)
+7. Question bank: data, quality, content pipeline
+8. Registration, authentication, accounts (no e-mail)
+9. DSGVO / privacy-by-design / child protection ⚖️
+10. UX & screens
+11. Visual design system
+12. Motion, sound, haptics
+13. Accessibility
+14. Technical architecture (stack, PWA, API, DB schema, security, infra)
+15. GLM Build Playbook (phases, prompts, acceptance criteria)
+16. Admin / content back-office
+17. Testing & QA
+18. NFRs & metrics
+19. Roadmap
+20. Risks & open decisions
+
+---
+
+## 1. Vision, goals, non-goals
+
+### 1.1 Vision
+Pupils climb a 15-step prize ladder to **500,000 Taler** by answering multiple-choice questions, using jokers and nerve — while *unknowingly* repeating exactly the school material they have already been taught. The game is the hook; **repetition and mastery of the real German curriculum** is the purpose.
+
+### 1.2 Goals
+- G1. A polished, game-show-style experience (graphics, animation, sound, jokers) that children aged 10–14 actually want to replay.
+- G2. Questions strictly matched to the player's **school type** and **grade**: easy basics first, climbing to the player's current grade level. **Never content from a higher grade** (hard invariant, see §6).
+- G3. **Zero personal data beyond a pseudonymous player name, school type, grade and PIN.** No e-mail, no phone, no real-name requirement, no tracking, no third-party services.
+- G4. Installable PWA (phone, tablet, desktop), offline-capable for training mode.
+- G5. Learning value: explanation after each answer, personal "Wiederholungsstapel" (review deck) of missed questions, topic mastery overview.
+
+### 1.3 Non-goals (v1)
+- No real money, no prizes, no gambling mechanics, no in-app purchases, no ads, no loot boxes.
+- No chat, no user-generated content visible to others, no friends list, no uploads.
+- No teacher/class accounts (see roadmap v2 for anonymous class codes).
+- No runtime AI/LLM calls (AI is used only offline for content generation; the running game contains no AI and sends no data to AI services).
+- No religion/Ethik content in v1 (state-specific and sensitive). No Latin/French in v1.
+
+---
+
+## 2. Product principles & hard rules
+
+These are non-negotiable and override convenience.
+
+1. **No hardcoded values.** Game rules (ladder amounts, safe levels, tier weights, timers), school types, grades, subjects, topics, texts that may change, achievement definitions — all DB-driven or env-driven. Defaults ship as **seed migrations**, not as constants in code.
+2. **No mock data.** Every screen reads real data from the API/DB. Seed data = real, reviewed content.
+3. **SQLite** as the database (WAL mode). Self-hosted via **Dokploy + Traefik** on the DFM VPS (EU/Germany).
+4. **Privacy by design & default** (Art. 25 DSGVO). Collect the minimum; delete automatically.
+5. **Curriculum safety invariant:** no question may ever be shown to a player whose track/grade has not yet covered its topic.
+6. **Child-first UX:** no dark patterns, no streak-guilt, no manipulative timers or notifications, no social pressure.
+7. **Server-authoritative gameplay:** correct answers never leave the server in ranked mode.
+8. **Everything original:** own name, mascot, visuals, music, sound (see §4).
+9. **One design system**, consistent everywhere; touch-first, works on phone, tablet and desktop.
+10. **No duplicate functionality** across screens (e.g., settings only in Settings, privacy info only in Datenschutz).
+
+---
+
+## 3. Target users & personas
+
+| Persona | Description | Needs |
+|---|---|---|
+| **Mia, 11, Gymnasium Kl. 5** | Just changed schools, loves games, reads at grade level | Easy start, quick wins, clear explanations |
+| **Emre, 13, Realschule Kl. 7** | Unsure in Deutsch/Englisch, plays on a shared family tablet | No reading walls, big buttons, no embarrassment on mistakes, PIN he can remember |
+| **Lena, 12, Gesamtschule Kl. 6** | Competitive, wants a challenge | Hard top rungs, private progress stats |
+| **Parent (secondary user)** | Wants to know the game is safe | Plain-language privacy info, no registration data about the child, simple deletion |
+| **Admin / content editor (DFM)** | Maintains question bank | Fast review queue, import/export, stats, reports |
+
+---
+
+## 4. Brand, IP safety & naming
+
+### 4.1 IP safety (important)
+The TV format "Who Wants to Be a Millionaire?" / "Wer wird Millionär?" has protected **name, logo, music, studio look (blue stage, hexagonal answer plates, lighting) and mascot-free trade dress**. The *mechanics* (15 questions, 4 answers, safe levels, 50:50 / audience / phone jokers) are generic quiz mechanics and may be used.
+
+**Therefore:**
+- Do **not** use the names "Millionär", "Millionaire", "Wer wird…", the show's logo, fonts, music, sound effects, studio colours/hexagon plates, or the host.
+- Prize unit is a virtual, clearly fictional currency (**Taler**), shown explicitly as "Spielgeld — keine echten Preise".
+- Own visual identity (§11), own music/sfx (§12).
+
+### 4.2 Working name
+**Wissensgipfel** — "knowledge summit". The ladder is visualised as a **mountain climb** (15 stations to the summit at 500,000 Taler).
+Alternatives (to check for trademark conflicts before launch ⚖️): *Gipfelstürmer*, *Quizgipfel*, *Lernleiter*.
+
+### 4.3 Mascot
+**Lumi**, a friendly owl (original character design; gender-neutral, neutral expressions: thinking, cheering, sympathetic, surprised). Lumi acts as host voice in text bubbles and as the "Freund" joker.
+
+### 4.4 Tone of voice
+German, informal **"du"**, short sentences, encouraging, never sarcastic. Wrong answer = "Knapp daneben! Lumi erklärt dir, warum." Never "Falsch!" in red-alarm style.
+
+---
+
+## 5. Game design
+
+### 5.1 Core loop
+1. Player logs in → Home → **"Spiel starten"**.
+2. Game generates 15 questions (§6) → player climbs the ladder.
+3. Each question: read → (optionally use a joker) → pick A/B/C/D → **"Final?" confirmation** (large "Ja, final!" / "Nochmal überlegen") → reveal with suspense → explanation card → next.
+4. Game ends by: wrong answer (drop to last safe level), walk-away ("Aussteigen" — keep current winnings), or reaching 500,000.
+5. Result screen: winnings, topic breakdown, missed questions auto-added to **Wiederholungsstapel**, XP/badges.
+
+### 5.2 Prize ladder (default seed; stored in DB table `ladder_levels`)
+
+| Level | Taler | Safe? | Tier |
+|---:|---:|:---:|:---:|
+| 1 | 50 | | A |
+| 2 | 100 | | A |
+| 3 | 200 | | A |
+| 4 | 300 | | A |
+| 5 | 500 | ✅ (Sicherheitsstufe 1) | A |
+| 6 | 1,000 | | B |
+| 7 | 2,000 | | B |
+| 8 | 4,000 | | B |
+| 9 | 8,000 | | B |
+| 10 | 16,000 | ✅ (Sicherheitsstufe 2) | B |
+| 11 | 32,000 | | C |
+| 12 | 64,000 | | C |
+| 13 | 125,000 | | C |
+| 14 | 250,000 | | C |
+| 15 | **500,000** | 🏔️ Gipfel | C |
+
+- Wrong answer → fall back to the highest safe level reached (0 if none).
+- "Aussteigen" available before locking in an answer from level 2 on.
+- Ladder is data-driven: admins may change amounts/safe levels in the back-office without a deploy.
+
+### 5.3 Jokers (each once per game; all configurable on/off in DB)
+
+| Joker | Name (UI) | Behaviour |
+|---|---|---|
+| 50:50 | **50:50** | Server removes two wrong answers. Animated "poof" of the two plates. |
+| Audience | **Klassen-Umfrage** | Shows animated bar chart. Percentages come from **real aggregated answer statistics** of that question when ≥ 30 answers exist, else from a difficulty-based model. Labelled "Umfrage unter Mitspielern" (never claims to be a real class). Can be wrong occasionally, as real polls are. |
+| Phone | **Lumi fragen** (Freund) | Lumi gives an opinion with a confidence phrase ("Ich bin mir ziemlich sicher…", "Hmm, ich tippe auf…"). Correctness probability decreases with ladder level (configurable, e.g. 95 % → 60 %). Teaches critical thinking: Lumi can be wrong. Phrases from DB, varied. |
+| Switch | **Frage tauschen** | Replaces the current question with a fresh one of the same level/tier (counts as used). |
+
+Joker state is server-side; all joker results are generated server-side.
+
+### 5.4 Timer (accessibility-aware)
+Setting (per player, default **off**): `Aus` / `Entspannt 60 s` / `Challenge 30 s`. Timer never shown as a loud countdown; soft ring around the question card. Timeout = counts as "no answer" → treated as wrong (only if timer is enabled).
+
+### 5.5 Modes
+
+| Mode | Description | Ranked/Scored |
+|---|---|---|
+| **Gipfel-Spiel** | The 15-question ladder game | Yes (private stats) |
+| **Training** | Pick 1–N subjects/topics, endless or 10-question rounds, no ladder, no jokers, immediate explanation, unlimited tries | No |
+| **Wiederholungsstapel** | Spaced repetition over previously missed questions (Leitner boxes 1–4: 1 day / 3 days / 7 days / 21 days; intervals in DB) | No |
+| **Tagesquiz** | 5 questions/day, same for all players of same school type + grade (deterministic seed by date+track+grade); small bonus XP; **no streak penalty** | Light |
+| **Offline-Training** (v1.1) | Downloaded question pack (200 questions), unranked | No |
+
+### 5.6 Progression (non-manipulative)
+- **XP & level** ("Bergsteiger-Rang": Wanderer → Kletterer → Gipfelstürmer …), earned from correct answers and completed games. Rank names in DB.
+- **Badges** ("Abzeichen"), DB-defined (e.g., "Erste 5.000 Taler", "Mathe-Profi: 50 richtige Mathe-Antworten", "Gipfel erreicht", "Fehler-Besieger: 20 Wiederholungsfragen gemeistert").
+- **Topic mastery** per subject: simple bars based on rolling accuracy; shown privately in Profile.
+- **Private percentile**: "Du bist besser als 70 % der Spieler:innen in Klasse 6 Gymnasium" (computed from anonymous aggregates; shown only if ≥ 50 players in cohort).
+- **Public leaderboard: OFF by default** (privacy by default). Optional opt-in "Bestenliste" showing only the pseudonymous display name (without tag), highest ladder level this week; opt-in requires a parent-info confirmation screen. ⚖️
+
+---
+
+## 6. Curriculum & question-selection engine (core logic)
+
+### 6.1 Concepts
+
+- **School type (Schulform)** chosen at registration. NRW-oriented v1 list (DB table `school_types`):
+
+| Code | Label | Content track |
+|---|---|---|
+| `HS` | Hauptschule | `basic` |
+| `RS` | Realschule | `mid` |
+| `SEK` | Sekundarschule | `mid` |
+| `GE` | Gesamtschule | `mid` (optional "Erweiterungsniveau" toggle → `advanced` for selected subjects; v1.1) |
+| `GY` | Gymnasium | `advanced` |
+
+  *Open decision:* Förderschulen and other Länder-specific types (e.g., Mittelschule, Oberschule, Stadtteilschule) — extensible via DB; v1 targets **NRW**. A Bundesland field is **not** collected in v1 (data minimisation); content is NRW-aligned and flagged as such in the info page. ⚖️/📚
+
+- **Grade (Klasse):** 5, 6, 7, 8 selectable. Content for **grade 4 (Grundschule basics)** exists in the bank as foundation material but is *not* selectable as a player grade. (Optional later: allow 9, 10.)
+
+- **Question attributes relevant for selection:**
+  - `intro_grade_hs`, `intro_grade_rs`, `intro_grade_gy` — **the grade in which that topic is first taught on that track** (nullable = not part of that track's curriculum, or not yet verified). SEK/GE use the `mid` column.
+  - `difficulty` 1–5 (relative difficulty *within* its introduction grade).
+  - `subject_id`, `topic_id` (links to curriculum map).
+  - `status` must be `published`.
+
+### 6.2 HARD INVARIANT (must be enforced in code AND tested)
+
+> For player grade **N** and track **T**: a question is eligible **only if** `intro_grade_T IS NOT NULL AND intro_grade_T ≤ N`, `status = 'published'`, and its topic is flagged `active` for track T.
+
+Example: Gymnasium, Klasse 6 → eligible: intro grade 4, 5, 6. **Never 7 or 8.** A question with `intro_grade_gy = NULL` is *never* shown to Gymnasium players.
+
+Enforced at three layers:
+1. SQL query filter (primary).
+2. Post-filter assertion in the selection service (throws + logs if violated; the game falls back to a safe replacement).
+3. CI property test: simulate ≥ 100,000 games across all (track, grade) combinations; assert zero violations (see §17).
+
+### 6.3 Tier composition (difficulty ladder across grades)
+
+Let `k = N − g` where `g` = effective intro grade of the question on the player's track (k = 0: current grade; k = 1: one grade below; k ≥ 2: two or more below, including grade-4 basics).
+
+Default weights (stored in `selection_profiles` / `selection_weights`, editable in admin):
+
+| Tier | Ladder levels | difficulty allowed | k=0 | k=1 | k≥2 |
+|---|---|---|---:|---:|---:|
+| **A — Warm-up** | 1–5 | 1–2 | 10 % | 30 % | 60 % |
+| **B — Mixed** | 6–10 | 2–3 | 35 % | 40 % | 25 % |
+| **C — Challenge** | 11–15 | 3–5 | 70 % | 25 % | 5 % |
+
+Additional rules:
+- **Level 15** is always `k = 0`, `difficulty = 5`, if available (fallback to difficulty 4, then k=0 any).
+- **Levels 13–14**: ≥ 80 % `k = 0` combined.
+- If a weight bucket is empty (e.g., N = 5 has no `k ≥ 2` except grade 4), **renormalise** weights across non-empty buckets. For N = 5, the pool is grade 4 + grade 5 only.
+- Within a bucket, difficulty is sampled so that it **rises monotonically-ish** along the ladder (e.g., difficulty target = round(1 + 4·(level−1)/14) ± 1, clamped to allowed range).
+- **Subject diversity:** at most 2 consecutive questions from the same subject; every game covers ≥ 6 subjects (when available); no subject > 4 questions (configurable).
+- **Subject availability per grade/track:** a subject appears only if the topic map has active topics for that grade/track (e.g., Chemie not before its introduction grade).
+- **Freshness:** exclude questions the player answered in the last *X* games (default last 10 games ≈ 150 questions, or last 60 days; whichever is larger-pool-safe). If the pool is exhausted, relax to "least recently seen". Seen-history is stored per player (pseudonymous), purged with the account.
+- **Same-game uniqueness:** no duplicate question or near-duplicate (same `cluster_id`) in one game.
+- **Switch joker:** replacement drawn with identical constraints for that level, excluding all questions already used in this game.
+- **Pool-size guard:** if the eligible pool for any (track, grade, tier) is smaller than a configurable minimum (default 60), the admin dashboard flags a **content gap**; the game still works with relaxation rules but logs `pool_relaxed`.
+
+### 6.4 Selection algorithm (reference pseudocode)
+
+```text
+function buildGame(player):
+  N = player.grade; T = player.track
+  profile = loadSelectionProfile(T)                // DB
+  used = []; seenRecently = loadSeen(player)       // DB
+  for level in 1..15:
+     tier = tierOf(level)                           // DB ladder_levels.tier
+     w = renormalise(profile.weights[tier], availableKBuckets(N,T))
+     bucket = sampleBucket(w)                       // k=0 / k=1 / k>=2
+     targetDiff = difficultyTarget(level, tier)
+     q = pick(
+        eligible(N,T)                               // HARD INVARIANT
+        .where(k in bucket, difficulty in tierRange(tier))
+        .excluding(used, seenRecently, sameCluster(used))
+        .respecting(subjectDiversityRules(used))
+        .weightedByCloseness(difficulty, targetDiff)
+        .random(seeded))
+     assert(q.introGrade(T) <= N)                   // layer 2
+     used.push(q)
+  persist game + ordered question ids (answers stay server-side)
+```
+
+### 6.5 Curriculum map (scaffold — **must be validated by a teacher against the NRW Kernlehrpläne**)
+
+Stored in DB tables `subjects`, `topics`, `topic_track_grade` (which topic is taught in which grade on which track). The table below is the **initial seed scaffold** for content generation; it is a planning aid, not an authoritative curriculum. Anything uncertain gets `intro_grade_* = NULL` until verified ("when in doubt, leave it out").
+
+| Subject (Fach) | Grade 4 (basics) | Grade 5 | Grade 6 | Grade 7 | Grade 8 |
+|---|---|---|---|---|---|
+| **Deutsch** | Wortarten (Nomen, Verb, Adjektiv), Satzarten, Groß-/Kleinschreibung, Dehnung/Schärfung, Wortfamilien | Wortarten erweitert, Satzglieder (Subjekt/Prädikat/Objekte), Zeitformen, 4 Fälle, das/dass, Märchen/Fabel/Sage, Aufzählungskomma | Satzreihe/Satzgefüge, Kommaregeln, Aktiv/Passiv, wörtliche Rede, Gedichtmerkmale, Berichten/Beschreiben | Nebensatzarten, Textarten, Stilmittel, Argumentieren, Kurzgeschichte/Ballade | Konjunktiv I/II, indirekte Rede, Erörterung, Sachtexte, Fremdwörter, Stilmittel vertieft |
+| **Mathematik** | Zahlenraum bis 1 Mio., schriftl. Rechnen, Einmaleins, Größen (Länge, Zeit, Geld), Grundformen, einfache Brüche | Natürliche Zahlen, Runden, Rechengesetze, Brüche (Einführung), Dezimalzahlen, Winkel, Symmetrie, Umfang/Fläche, Körper | Bruchrechnen, Dezimalrechnen, Teilbarkeit/Primzahlen, Dreisatz/Proportionalität, Koordinatensystem, Dreiecke, Statistik (Grundlagen) | Negative/rationale Zahlen, Prozent/Zinsen (Grundlagen), Terme & Gleichungen, Zuordnungen, Kongruenz/Konstruktion, Wahrscheinlichkeit (Grundlagen) | Lineare Funktionen, Gleichungssysteme (Einführung), Terme (vertieft), Prozentrechnung vertieft, Daten & Zufall |
+| **Englisch** | Basic words (colours, numbers, family, animals) | Greetings, present simple, "to be/have got", vocabulary (school, home, hobbies) | Past simple, comparatives/superlatives, "going to", prepositions of place/time | Present perfect, will-future, conditional I, question forms | Passive (intro), conditional II, reported speech (intro), relative clauses |
+| **Biologie** | Tiere der Heimat, Pflanzen, Jahreszeiten | Wirbeltiere/Säugetiere, Haustiere, Pflanzenbau, Wald, Sinne | Ökosystem, Fortpflanzung (Pflanze/Tier), Ernährung/Gesundheit | Zelle/Mikroskop, Verdauung, Atmung, Blutkreislauf, Ökologie | Nervensystem, Genetik (Basics), Körper & Gesundheit (altersgerecht) |
+| **Physik** | — | Optik (Licht/Schatten, Spiegel), Akustik (Schall) | Wärme/Temperatur, einfache Stromkreise | Kräfte, Druck, Dichte | Elektrizität, Energieformen |
+| **Chemie** | — | — | — | Stoffe/Eigenschaften, Aggregatzustände, Gemische/Trennverfahren | Verbrennung, Luft, Atome/Elemente (Intro) |
+| **Geschichte** | — | Urgeschichte, Frühe Hochkulturen (Ägypten) | Antike (Griechenland, Rom) | Mittelalter, Entdeckungen | Reformation, Absolutismus, Franz. Revolution, Industrialisierung |
+| **Erdkunde** | Orientierung, Karte | Orientierung/Karten/Maßstab, Deutschland, Landwirtschaft | Europa, Klima/Zonen, Gebirge | Kontinente/Asien/Afrika, Globalisierung (Intro) | Rohstoffe, Klimawandel, Bevölkerung, Entwicklungsunterschiede |
+| **Politik/Wirtschaft** | — | Familie, Schule, Regeln | Gemeinde, Medien, Konsum/Geld | Demokratie, Grundgesetz, Wahlen (Basics) | Wirtschaft/Markt, Jugendschutz, EU |
+| **Informatik/Medien** | Sicherer Umgang mit Internet (Basics) | Passwörter, Datenschutz-Basics | Algorithmen (Intro), Medienkritik | Binärsystem/Codierung (Intro) | Netzwerke, KI-Basics (altersgerecht) |
+| **Kunst & Musik** | Farben, Instrumente | Farbenlehre, Notenwerte, Instrumentenfamilien | Perspektive, Takt/Rhythmus | Komponisten (Epochen-Intro), Gestaltungsprinzipien | Stilepochen (Kunst/Musik) vertieft |
+| **Sport & Gesundheit** | Spielregeln | Fitness, Ernährung | Hygiene, Teamsport-Regeln | Herz-Kreislauf, Erste Hilfe | Sucht-Prävention (altersgerecht), Training |
+| **Allgemeinwissen/Natur&Technik** | Tiere, Länder, Alltag | Rekorde, Natur, Erfindungen | Weltall (Basics), Wetter | Technik & Erfindungen | Umwelt & Nachhaltigkeit |
+
+Excluded in v1: Religion/Ethik, Latein/Französisch/Spanisch, National-socialism and other sensitive historic periods (grade 9+ in NRW typically), sexual-education details beyond neutral age-appropriate "Körper & Gesundheit".
+
+### 6.6 "Cumulative review" principle
+The game is built for **repetition**: lower-grade material is deliberately mixed in (the tier weights). A grade-8 player still meets grade-5 basics in warm-up levels. This is intended and explained on the Game Setup screen ("Dein Gipfel enthält Wiederholung + Klasse-8-Wissen").
+
+---
+
+## 7. Question bank
+
+### 7.1 Question formats
+- **v1:** text multiple-choice, 4 options, exactly 1 correct.
+- **v1.1:** + image questions (geometry figures, maps, animals) with **required alt text**; + simple ordering questions (optional).
+- Max lengths: question ≤ 180 chars (Deutsch text-based questions ≤ 320), answer option ≤ 50 chars, explanation ≤ 240 chars.
+- Reading level matches the **intro grade** (short sentences, no jargon beyond the topic).
+
+### 7.2 Question record (see schema §14.5)
+Fields: `text`, `options[4]`, `correct_index`, `explanation`, `subject_id`, `topic_id`, `intro_grade_hs/rs/gy`, `difficulty`, `cluster_id`, `media_id?`, `source_note` (e.g., "NRW KLP Mathematik Sek I, Bereich Zahlen"), `status` (`draft` → `auto_checked` → `in_review` → `published` / `rejected` / `retired`), `created_by` (`glm`/`template`/`human`), `reviewed_by`, `reviewed_at`, `version`.
+
+### 7.3 Content quality rules
+- Exactly one unambiguously correct answer; distractors plausible but definitely wrong.
+- No "alle genannten", "keine davon", no negations ("Welche ist NICHT…") in difficulty ≤ 2.
+- No time-sensitive facts that go stale (current officeholders, records) — or flag with `expires_at`.
+- No politics-of-the-day, no brands/advertising, no violence glorification, no stereotypes.
+- Gender-fair, neutral names in examples (e.g., "Mia", "Can", "Jonas", "Aylin").
+- Correct current German orthography (Duden); no regional-only terms unless taught.
+- Option order randomised at serve time (store canonical order; shuffle per game, seeded; `correct_index` is mapped server-side).
+
+### 7.4 Content pipeline (GLM-assisted, human-reviewed)
+
+```text
+[Topic seed list (from curriculum map)]
+        │
+        ▼
+ 1) GENERATE   — GLM with strict JSON schema (batch of 20 per topic/grade/difficulty)
+        │       + deterministic TEMPLATE GENERATORS for Mathe (computed answers → guaranteed correct)
+        ▼
+ 2) VALIDATE   — schema validation · length/format · profanity · duplicate/near-duplicate (normalised trigram)
+        │
+        ▼
+ 3) CROSS-CHECK — second, independent GLM pass: "solve it blind"; disagreement → quarantine
+        │
+        ▼
+ 4) READABILITY / POLICY check — reading level vs grade, forbidden-topic classifier
+        │
+        ▼
+ 5) HUMAN REVIEW — back-office queue (teacher/owner); approve / edit / reject; intro grade set per track
+        │
+        ▼
+ 6) PUBLISH → live; player "Frage melden" feedback loop → re-review; stats monitor (accuracy outliers flagged)
+```
+
+Rules:
+- **No question is published without human approval** (at minimum, a 100 % review of grade-6+ Deutsch/Englisch/Geschichte/Erdkunde/Biologie; Math template output may be sample-reviewed at ≥ 10 %).
+- Track-specific intro grades are **set by a human reviewer**, not by the model.
+- Content volume target: **launch minimum** ≥ 25 published questions per (subject × grade × difficulty band [1–2 / 3 / 4–5]) for each subject active in that grade/track; overall **≥ 4,000** published at launch, **12,000+** within 6 months. A content-coverage report in admin shows gaps.
+- Provenance recorded: generator, prompt version, model version.
+
+**Generation prompt template (for GLM):**
+
+```text
+Du bist Fachlehrer:in für {fach} an einer {schulform} in Nordrhein-Westfalen.
+Erstelle {n} Multiple-Choice-Fragen für Klasse {klasse}, Thema "{thema}", Schwierigkeit {difficulty}/5
+(1 = sehr leicht für diese Klasse, 5 = sehr schwer für diese Klasse).
+Regeln:
+- Genau 4 Antwortoptionen, genau 1 richtige. Plausible, aber eindeutig falsche Distraktoren.
+- Keine Verneinungsfragen bei Schwierigkeit <= 2. Kein "alle/keine der Antworten".
+- Sprachniveau: Klasse {klasse}. Frage <= 180 Zeichen, Option <= 50 Zeichen.
+- Erklärung (<= 240 Zeichen) in kindgerechtem Deutsch: warum ist die Antwort richtig?
+- Nur Wissen, das laut Lehrplan bis einschließlich Klasse {klasse} behandelt wird. Nichts aus höheren Klassen.
+- Keine tagesaktuellen Fakten, keine Marken, keine kontroversen politischen Themen.
+Gib ausschließlich gültiges JSON zurück:
+[{"text":"...","options":["...","...","...","..."],"correct_index":0,"explanation":"...","topic":"{thema}","difficulty":{difficulty},"suggested_intro_grade":{klasse},"curriculum_note":"..."}]
+```
+
+---
+
+## 8. Registration, authentication, accounts
+
+### 8.1 Data collected (complete list)
+| Field | Notes |
+|---|---|
+| **Spielername** (display name) | Pseudonym. UI strongly says: *"Nimm NICHT deinen echten Namen!"* + button **"Namen vorschlagen"** (adjective + animal, e.g., "Mutiger Fuchs"). Profanity/PII filter (blocks digits strings resembling phone numbers, e-mail/URL patterns, common real-name patterns not enforceable → mitigated by the pseudonym guidance). 3–20 chars. |
+| **Schulform** | Dropdown from `school_types` (type only — **never a specific school**) |
+| **Klasse** | 5 / 6 / 7 / 8 |
+| **PIN** | 4 digits (child-friendly), see below |
+| **Avatar** | Chosen from preset gallery (no uploads) — stored as `avatar_id` |
+
+> *Interpretation of "isim":* The brief says "name". Recommended and implemented as a **pseudonymous Spielername**. If the owner insists on first names, allow it but keep the warning; the data model does not change. ⚖️
+
+Nothing else. **No e-mail, no birth date, no address, no phone, no school name, no photo, no device identifiers.**
+
+### 8.2 Login identity
+- Because there is no e-mail, a login handle is **`Spielername#Tag`** where the **Tag** is a system-generated 4-digit number (e.g., `Mutiger Fuchs#4821`) shown prominently after registration ("Merke dir deinen Spielnamen + PIN!"). Login = Spielername + Tag + PIN.
+- Registration ends with a **"Mein Zugang"** card (printable / screenshot-friendly): handle, reminder to remember the PIN, **Rettungscode**.
+
+### 8.3 PIN security
+- Stored with **argon2id** (per-account salt) — never reversible.
+- Blocklist of trivial PINs (0000, 1234, 1111, 2580, birth-year-like patterns not detectable; only common list).
+- Rate limiting: per handle (5 fails → 5 min lock, then exponential up to 1 h), per IP (in-memory counters only, never persisted), global throttling. Lock-out messages are friendly and non-revealing ("Das hat nicht geklappt. Versuch es später nochmal.").
+- Constant-time responses; no account enumeration (same message for unknown handle and wrong PIN).
+- Optional: PIN length 6 if the owner prefers stronger security (config `pin_length`).
+
+### 8.4 Account recovery without e-mail
+- **Rettungscode:** three random words from a kid-friendly German word list + 2 digits, e.g., `Mond-Tiger-Brot-47`; shown once at registration; stored hashed. Allows PIN reset. Parent info text recommends writing it down.
+- No code, no recovery → "Neues Konto erstellen" (old data discarded). This is a conscious privacy trade-off, documented in Parent-Info.
+- "Rettungscode neu erzeugen" in Settings (requires PIN).
+
+### 8.5 Sessions
+- Server-side session; **`HttpOnly`, `Secure`, `SameSite=Lax`** cookie, strictly necessary (no consent banner needed under TDDDG §25(2) — ⚖️ confirm). Sliding expiry 30 days; "Abmelden" button; "Auf diesem Gerät eingeloggt bleiben" toggle (default off on shared devices prompt).
+- Shared-family-device friendly: quick **switch player** (re-enter PIN).
+
+### 8.6 Account lifecycle & deletion
+- **Self-service deletion** in Settings (requires PIN): immediate, hard delete of player + history.
+- **Auto-delete:** accounts inactive **12 months** (config) are deleted; no warning possible (no contact data) — documented.
+- **Data export** ("Meine Daten herunterladen", JSON) in Settings.
+- Changing grade: **"Neue Klasse"** available (grade increments are common each school year); changing school type allowed; history is retained but selection uses the current grade.
+
+### 8.7 Display-name uniqueness
+Handle uniqueness is by (`display_name`, `tag`) — display names need not be unique.
+
+---
+
+## 9. DSGVO / privacy-by-design / child protection ⚖️
+
+### 9.1 Data inventory
+
+| Data | Purpose | Retention | Legal basis (to be confirmed ⚖️) |
+|---|---|---|---|
+| Spielername, tag, avatar | Identification in game | Until deletion / 12 months inactivity | Art. 6(1)(b)/(f) or consent — see 9.2 |
+| Schulform, Klasse | Content selection | same | same |
+| PIN hash, Rettungscode hash | Authentication | same | same |
+| Game history (answers, scores, XP, badges, seen-question IDs, review deck) | Gameplay, learning features | same | same |
+| Session token | Keep login | ≤ 30 days | TDDDG §25(2) strictly necessary |
+| Server logs | Security/abuse | **7 days**, IP **truncated/anonymised** or not logged | Art. 6(1)(f) |
+| Aggregated question stats | Quality + audience joker | Anonymous, indefinite | Not personal data (no player link, min. cohort sizes) |
+
+**Not collected:** e-mail, IP in app DB, device fingerprint, analytics, advertising IDs, location, cookies other than the session cookie.
+
+### 9.2 Legal-basis & parental-consent question (key open item ⚖️)
+- Germany applies the **age of digital consent 16** (Art. 8 DSGVO) when consent is the legal basis; for a service offered directly to children below 16, consent requires parental authorisation.
+- The product aims to process **only pseudonymous, minimal data necessary to provide the requested game** — arguably Art. 6(1)(b) (providing the service) / 6(1)(f). Without e-mail, **verifiable parental consent cannot be collected digitally**.
+- **Recommended approach (to be validated by the DSB/lawyer):**
+  1. Data minimisation as designed (pseudonym, no contact data).
+  2. Child-friendly registration notice + clear **Parent-Info page** (reachable before registration) explaining the exact data, retention and rights.
+  3. Mandatory tick: **"Meine Eltern wissen, dass ich hier spiele"** (informational, not a legal consent substitute) plus a **parent gate** (adult-level challenge, not child-guessable) in front of the Parent-Info and leaderboard opt-in.
+  4. Optional opt-in features (leaderboard) are off by default.
+  5. Documented **DSFA/DPIA** (children's data → recommended even if not strictly mandatory), **Verzeichnis von Verarbeitungstätigkeiten**, **TOMs** (Art. 32).
+- Provide **two privacy notices**: *Kinder-Datenschutz* (reading level grade 5, short, icons) and *Eltern-/Vollversion* (formal Art. 13 DSGVO).
+- Rights handling (access, erasure, rectification, portability): fulfilled via **self-service** (export, delete, edit). Because the operator cannot identify a person without account access, requests by e-mail to the operator are answered only with proof of control (login handle + PIN/Rettungscode) — documented in the notice (Art. 11 DSGVO).
+
+### 9.3 Technical measures (privacy by design)
+- Hosting: DFM VPS in Germany/EU; **no US cloud services, no CDNs, no external fonts/scripts/maps/analytics**, all assets self-hosted.
+- HTTPS only (Traefik + Let's Encrypt), HSTS, strict **CSP** (`default-src 'self'`), `Referrer-Policy: no-referrer`, `Permissions-Policy` (no camera/mic/geo), `X-Content-Type-Options`, frame-ancestors none.
+- No third-party SDKs. No service-worker analytics. No push notifications in v1.
+- Logging without IP or with truncated IP + 7-day rotation; no request bodies logged; PINs never logged.
+- DB at rest on encrypted volume; encrypted off-site backups (EU) with ≤ 30-day retention (backups contain deleted users for up to the retention window — document in notice).
+- Admin accounts (adults) are separate from player accounts, with e-mail + strong password + TOTP; all admin actions in `audit_log`.
+- Pen-test checklist & dependency scanning (npm audit, Dependabot-equivalent) in CI.
+
+### 9.4 Child-protection / youth-media rules
+- No ads, no external links in the game, no contact between users, no public free-text anywhere (display name is the only free text; filtered).
+- No in-app purchases, no loot boxes, no randomised paid rewards (JMStV / USK-style principles).
+- Age-appropriate content only (§7.3), question-reporting button visible at all times.
+- **Imprint (Impressum, DDG §5)**, Datenschutz, Parent-Info reachable from every screen footer/Settings.
+- Accessibility aligned with BFSG/WCAG 2.2 AA even though a free game may fall outside BFSG scope ⚖️.
+
+### 9.5 Trademark/Copyright hygiene
+See §4.1; all images, fonts (OFL), sounds (self-synthesised or CC0 with recorded licence), icons (own/ISC/MIT) tracked in `ASSET_LICENSES.md`.
+
+---
+
+## 10. UX & screens
+
+### 10.1 Navigation model
+Bottom tab bar on phone, side rail on tablet/desktop (same design system, adaptive):
+**Start · Spielen · Üben · Profil**; settings via Profil.
+
+### 10.2 Screen inventory
+
+| # | Screen | Key content |
+|---|---|---|
+| 1 | **Splash/Landing** | Logo, Lumi, "Los geht's" / "Ich habe schon ein Konto", footer links (Datenschutz, Eltern-Info, Impressum) |
+| 2 | **Registration (4-step wizard)** | 1 Spielername (+Vorschlag) → 2 Schulform → 3 Klasse → 4 PIN (+Wiederholung) → **Mein Zugang** card + Rettungscode |
+| 3 | **Login** | Spielername, Tag, PIN pad (big numeric keypad), "PIN vergessen?" |
+| 4 | **Home** | Greeting (Spielername), big "Spiel starten", Tagesquiz, Wiederholungsstapel count, Rang/XP bar |
+| 5 | **Game Setup** | Summary "Klasse 6 · Gymnasium", mix explanation, joker overview, timer choice, "Los!" |
+| 6 | **Game Stage** | Question card, 4 answer plates, ladder rail, jokers, Lumi, optional timer ring |
+| 7 | **Ladder overlay** | Mountain path showing all 15 stations, safe stations flagged, current position |
+| 8 | **Joker modals** | 50:50, Klassen-Umfrage chart, Lumi bubble, Tauschen |
+| 9 | **Final-answer confirm** | Bottom sheet "Ist das deine finale Antwort?" |
+| 10 | **Reveal + Explanation** | Suspense animation → correct/incorrect → explanation card ("Warum?") → "Weiter" |
+| 11 | **Aussteigen confirm** | Shows winnings kept |
+| 12 | **Result** | Taler won, rank/XP, topic breakdown, missed questions → deck, share-free (no social share) |
+| 13 | **Training setup/run** | Subject/topic chips, 10-question rounds, immediate feedback |
+| 14 | **Wiederholungsstapel** | Due count, session runner |
+| 15 | **Profile** | Avatar, rank, badges, mastery bars, percentile, history list |
+| 16 | **Settings** | Sound, music, reduced motion, text size, dyslexia-friendly font, timer, change grade/school type, new Rettungscode, export data, delete account, logout |
+| 17 | **Eltern-Info / Datenschutz (Kids + Full) / Impressum / Hilfe** | Static, DB/markdown-driven content |
+| 18 | **Report question sheet** | Reasons: unklar / falsch / unpassend (no free text) |
+| 19 | **Offline & error states** | Friendly Lumi illustrations |
+| 20 | **Admin** (desktop) | See §16 |
+
+### 10.3 Game Stage wireframe (landscape tablet / desktop)
+
+```text
+┌────────────────────────────────────────────────────────────────────────────┐
+│ ☰  Wissensgipfel        Stufe 7 · 2.000 Taler      🔊  ⚙                   │
+├───────────────────────────────────────────────────────────┬────────────────┤
+│                                                           │  15  500.000 🏔│
+│   ┌─────────────────────────────────────────────────┐     │  14  250.000   │
+│   │ Mathematik · Klasse 5          [Timer-Ring]      │     │  13  125.000   │
+│   │                                                  │     │  12   64.000   │
+│   │  Wie viel Grad hat ein rechter Winkel?           │     │  11   32.000   │
+│   └─────────────────────────────────────────────────┘     │  10   16.000 ⛺│
+│                                                           │   9    8.000   │
+│   ┌──────────────────────┐ ┌──────────────────────┐       │   8    4.000   │
+│   │ ▲ A  45°             │ │ ● B  90°             │       │ ▶ 7    2.000   │
+│   └──────────────────────┘ └──────────────────────┘       │   6    1.000   │
+│   ┌──────────────────────┐ ┌──────────────────────┐       │   5      500 ⛺│
+│   │ ■ C  180°            │ │ ◆ D  360°            │       │   …            │
+│   └──────────────────────┘ └──────────────────────┘       │                │
+│                                                           │                │
+│   [50:50]  [Klassen-Umfrage]  [Lumi fragen]  [Tauschen]   │ [Aussteigen]   │
+│   🦉 Lumi: "Du schaffst das!"                              │                │
+└───────────────────────────────────────────────────────────┴────────────────┘
+```
+Portrait phone: question card top, answers stacked 2×2 (or 1×4 for long text), jokers as bottom row of 4 icon buttons (≥ 48 px), ladder in a pull-up sheet showing current level chip + next amounts.
+
+### 10.4 Registration UX details
+- One question per screen, big controls, progress dots, back arrow always available.
+- Real-time validation with friendly messages.
+- PIN entry via on-screen numeric pad (works with keyboard too), digits masked with dots, "Augen-Symbol" to reveal.
+- After registration: confetti-lite + "Mein Zugang" card. User must tick **"Ich habe mir meinen Zugang gemerkt"** to continue (prevents instant lockout).
+
+---
+
+## 11. Visual design system
+
+### 11.1 Concept: "Twilight Summit"
+A warm twilight mountain world: deep indigo sky with soft stars, layered mountain silhouettes, a glowing golden path winding up to a summit with a beacon. Friendly, premium, **not** a copy of the TV studio (no blue hexagon stage). Shapes: **rounded rectangles / "stone tablets"** with soft inner glow; ladder = trail with camp stations.
+
+### 11.2 Design tokens (CSS variables; also stored as JSON for theming)
+
+**Colour (dark theme default; light theme variant "Tagsüber" optional)**
+| Token | Hex | Use |
+|---|---|---|
+| `--bg-0` | `#12102B` | App background (night indigo) |
+| `--bg-1` | `#1C1A44` | Surface |
+| `--bg-2` | `#2A2766` | Raised surface |
+| `--ink` | `#F5F3FF` | Primary text on dark |
+| `--ink-dim` | `#BDB8E6` | Secondary text |
+| `--gold` | `#FFC83D` | Primary accent, CTA, prize |
+| `--gold-deep` | `#E59A00` | Accent pressed |
+| `--mint` | `#3DDBA4` | Correct |
+| `--coral` | `#FF6B7A` | Wrong (soft, not alarming) |
+| `--sky` | `#5CC8FF` | Info/selected |
+| `--violet` | `#8B6CFF` | Brand secondary |
+| `--focus` | `#FFFFFF` + 3 px outline | Focus ring |
+
+All text/background pairs ≥ **4.5:1** (large text ≥ 3:1); verified in CI by a contrast script.
+
+**Answer plate identity (never colour-only):** each option has **letter + shape icon + position**: A ▲, B ●, C ■, D ◆. Colours: A `#7C6CFF`, B `#31B7E6`, C `#F2A93B`, D `#E86CB5` (idle); states: selected (gold outline + lift), locked (pulsing gold), correct (mint fill + ✓ + sound), wrong (coral fill + ✕), eliminated by 50:50 (faded + strikethrough).
+
+**Typography (self-hosted, SIL OFL)**
+- Display: **Baloo 2** (friendly, rounded) — headings, prize numbers.
+- Body/UI: **Lexend** (designed to improve reading fluency) — questions, answers, UI. Option "Dyslexie-Modus": Atkinson Hyperlegible + wider letter/line spacing.
+- Scale (rem): 0.875 / 1 / 1.125 / 1.25 / 1.5 / 2 / 2.75; question text clamp(1.25rem, 2.2vw+0.8rem, 2rem). User text-size setting 100 / 125 / 150 %.
+
+**Spacing & shape:** 4-pt grid (4,8,12,16,24,32,48); radius `--r-s 10px`, `--r-m 18px`, `--r-l 28px`; min touch target **48×48 px** (answers ≥ 64 px high).
+**Elevation:** soft glows rather than hard shadows (`0 8px 24px rgba(0,0,0,.35)`, accent glow `0 0 24px rgba(255,200,61,.35)`).
+**Iconography:** one consistent rounded line/solid icon set (self-hosted SVG sprite, e.g., Lucide/ISC-licensed) + custom joker icons.
+
+### 11.3 Components
+Button (primary gold, secondary outline, ghost), IconButton, AnswerPlate, QuestionCard, LadderRail, LadderMountain (SVG), JokerButton (with used/disabled state), Modal/BottomSheet, Toast, Badge, XPBar, MasteryBar, PinPad, Stepper, AvatarPicker, Chip (subject), Card, Tabs, Switch, Slider, EmptyState (Lumi), Skeleton loaders. Each documented with states (default/hover/focus/active/disabled/loading) in the component library page (`/dev/styleguide`, dev-only).
+
+### 11.4 Illustration & assets
+- Backgrounds: parallax SVG mountain layers (3–4 layers), star field (CSS/canvas, auto-reduced on low-power).
+- Lumi: SVG with 6 poses (idle, thinking, cheering, sympathetic, surprised, sleeping); optional Lottie-free animation via CSS/GSAP.
+- 24 preset avatars (animals/space/robots; abstract, no human faces).
+- Badge artwork: 20 initial badges.
+- All assets original or properly licensed; vector-first; total initial download budget in §18.
+
+### 11.5 Responsive behaviour
+Breakpoints: 360 / 600 / 900 / 1200. Phone portrait (stacked), tablet landscape (2-column with ladder rail), desktop (centred 1100 px stage, ladder rail right). Safe-area insets respected; PWA standalone with `display: standalone`, theme-color `#12102B`, orientation unrestricted.
+
+---
+
+## 12. Motion, sound, haptics
+
+### 12.1 Animation spec (GSAP timeline or CSS; honour `prefers-reduced-motion` + in-app toggle)
+
+| Moment | Animation | Duration |
+|---|---|---|
+| Screen transition | Fade + 12 px slide | 220 ms |
+| Question reveal | Card slides up, text fades in word-group; answers stagger in A→D | 450 ms + 80 ms stagger |
+| Select answer | Plate lifts 4 px, gold outline, soft glow | 150 ms |
+| Lock in ("Final!") | Plate pulses (scale 1→1.03→1, 2×), others dim to 60 % | 700 ms loop |
+| Suspense | Lumi "thinking" pose, background stars slow-twinkle, subtle vignette | 1.5–3 s (configurable by level) |
+| Reveal correct | Plate turns mint + sparkle burst; ladder marker climbs to next station along the path | 900 ms |
+| Reveal wrong | Plate turns coral, gentle shake (2 px, 2 cycles), correct plate glows mint | 700 ms |
+| 50:50 | Two plates "dissolve" into stardust | 600 ms |
+| Klassen-Umfrage | 4 bars grow with easing, numbers count up | 1.2 s |
+| Lumi fragen | Lumi slides in, speech bubble typewriter | 1.5 s |
+| Safe station reached | Camp-fire/beacon lights, mini fireworks | 1.2 s |
+| Summit (500,000) | Full-screen golden confetti + beacon beam + Lumi cheering | 4 s |
+| Taler counter | Numbers roll (odometer) | 800 ms |
+
+Performance rules: animate only `transform`/`opacity`; ≤ 60 particles on mobile; auto-degrade to simple fades if frame-time > 24 ms for 1 s; reduced-motion = crossfades only.
+
+### 12.2 Sound design (all original/synthesised; **never** the TV show's cues)
+Engine: **Web Audio API** (self-written synth for tones/stingers) + a small set of **CC0 or self-produced** compressed samples (Opus/AAC ≤ 400 KB total). Audio lazily unlocked after first user gesture.
+
+| Cue | Description |
+|---|---|
+| Menu ambience | Calm 60-s loop, soft pads (optional, off by default after first run prompt) |
+| Question tension bed | Low-intensity looping pulse; intensity steps up by tier (A/B/C) |
+| Select / lock | Soft click / rising two-note |
+| Correct | Bright major arpeggio |
+| Wrong | Soft descending two-note (not harsh) |
+| Safe station | Warm chime fanfare |
+| Joker cues | 50:50 "poof", phone "ring-ring" (own tone), audience murmur (synth noise) |
+| Summit | Original 4-s triumphant stinger |
+Controls: Master, Music, Effects sliders + mute; default volume 60 %; honours device silent mode where possible.
+
+### 12.3 Haptics
+`navigator.vibrate` (where supported): 10 ms on select, 30 ms on correct, 40–60–40 on wrong; off with reduced-motion/setting.
+
+---
+
+## 13. Accessibility (WCAG 2.2 AA target)
+- Full keyboard operation (A–D keys select, Enter confirms, J cycles jokers, Esc closes), visible focus.
+- Screen-reader semantics: question as `role="group"` with `aria-labelledby`, answers as radio group, live region announces results ("Richtig! Erklärung: …"), ladder as a list with `aria-current`.
+- Not colour-only (letters + shapes), contrast ≥ 4.5:1, text resizing to 200 % without loss.
+- Dyslexia mode, adjustable text size, reduced motion, sound-off friendly (every sound has a visual equivalent).
+- Optional **read-aloud** (v1.1) via the browser's built-in Web Speech API (on-device; no data leaves).
+- Touch targets ≥ 48 px; no time pressure unless the player enables the timer; no flashing > 3 Hz.
+- German plain-language option for instructions ("Leichte Sprache" for Help page, v1.1).
+
+---
+
+## 14. Technical architecture
+
+### 14.1 Stack (chosen for GLM-friendliness and DFM familiarity)
+| Layer | Choice |
+|---|---|
+| Frontend | **Vue 3 + TypeScript + Vite**, Pinia, Vue Router, vue-i18n (DE only, i18n-ready), **GSAP** (animation), plain CSS variables + utility CSS (no heavy UI kit) |
+| PWA | **vite-plugin-pwa** (Workbox): precache app shell, runtime cache for static assets, IndexedDB (idb) for offline training packs |
+| Backend | **Node 22 + Fastify + TypeScript**, Zod validation, argon2, pino (no PII) |
+| DB | **SQLite** (better-sqlite3, WAL) + **Drizzle ORM** migrations & seeds |
+| Audio | Web Audio API (+ small Howler-free sample loader) |
+| Tests | Vitest (unit/property), Playwright (E2E, a11y via axe), Lighthouse CI |
+| Infra | Docker (single image: API serves built PWA static files) → **Dokploy** + **Traefik**, SQLite volume, nightly encrypted backup |
+| Monorepo | pnpm workspaces: `apps/web`, `apps/api`, `packages/shared` (zod schemas/types) |
+
+### 14.2 Repository layout
+```text
+wissensgipfel/
+├─ prd.md
+├─ docs/ (DESIGN.md, DATABASE.md, RULES.md, AI_RULES.md, ASSET_LICENSES.md, DSFA.md)
+├─ apps/
+│  ├─ web/ (src/{views,components,stores,composables,audio,styles,i18n,pwa})
+│  └─ api/ (src/{routes,services,db,jobs,security,admin})
+├─ packages/shared/ (schemas, types, constants-free; no business constants)
+├─ content/ (generation prompts, template generators, import/export JSON)
+├─ docker/ (Dockerfile, compose, traefik labels)
+└─ scripts/ (seed, content-check, license-check, contrast-check)
+```
+
+### 14.3 PWA requirements
+- Web app manifest: name, short_name, icons (192/512 + maskable), `display: standalone`, `start_url: /?source=pwa`, theme/background colour, categories `education, games`.
+- Service worker: precache shell + fonts + core audio; `StaleWhileRevalidate` for static; **network-only for `/api/*`** (ranked games and auth); offline fallback page; clean update flow ("Neue Version verfügbar" toast, no forced reload mid-game).
+- Install prompt: custom, non-intrusive, shown after 2nd completed game.
+- Offline: Home + Settings + Offline-Training + Wiederholung from cached packs (v1.1); ranked play requires connection.
+- Lighthouse PWA/Accessibility/Best-Practices ≥ 95; Performance ≥ 90 (mid-range Android, 4G throttle).
+
+### 14.4 API (REST, JSON, versioned `/api/v1`)
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /auth/register` | name, schoolType, grade, pin, avatarId → handle, rescueCode |
+| `POST /auth/login` / `POST /auth/logout` | handle(name+tag) + pin |
+| `POST /auth/reset-pin` | handle + rescueCode + newPin |
+| `GET /me` / `PATCH /me` | profile, change grade/school type/avatar/settings |
+| `DELETE /me` | delete account (PIN re-auth) |
+| `GET /me/export` | JSON export |
+| `GET /meta/school-types` `GET /meta/grades` `GET /meta/subjects` | DB-driven lists |
+| `POST /games` | create ladder game (server builds 15 questions) → game id + first question (no answers) |
+| `GET /games/:id` | state (level, jokers, current question) |
+| `POST /games/:id/answer` | `{questionRef, optionIndex}` → result, correctIndex, explanation, next |
+| `POST /games/:id/joker` | `{type}` → joker result |
+| `POST /games/:id/walk-away` | end with winnings |
+| `POST /training/sessions` / `…/answer` | training rounds |
+| `GET /review/due` / `POST /review/answer` | Leitner deck |
+| `GET /daily` / `POST /daily/answer` | Tagesquiz |
+| `GET /me/stats` | mastery, badges, percentile |
+| `POST /questions/:id/report` | reason enum |
+| `GET /content/:slug` | legal/info pages (Datenschutz, Eltern-Info, Impressum, Hilfe) |
+| `/admin/*` | back-office (see §16), separate auth |
+
+Question payload to client: `{ref, text, options (shuffled), media?, subject, level}`; `ref` is a per-game opaque token; **no `correct_index`, no topic, no `intro_grade`** until reveal.
+
+### 14.5 Database schema (SQLite; abridged DDL — full version in `docs/DATABASE.md` generated in Phase 1)
+
+```sql
+-- Reference data (all seeded by migrations, editable in admin)
+CREATE TABLE school_types (code TEXT PRIMARY KEY, label TEXT NOT NULL, track TEXT NOT NULL CHECK(track IN ('basic','mid','advanced')), active INTEGER NOT NULL DEFAULT 1, sort INTEGER);
+CREATE TABLE grades (grade INTEGER PRIMARY KEY, label TEXT NOT NULL, selectable INTEGER NOT NULL DEFAULT 1); -- 4 = basics, selectable=0
+CREATE TABLE subjects (id INTEGER PRIMARY KEY, code TEXT UNIQUE, label TEXT NOT NULL, icon TEXT, color TEXT, active INTEGER DEFAULT 1);
+CREATE TABLE topics (id INTEGER PRIMARY KEY, subject_id INTEGER REFERENCES subjects(id), code TEXT UNIQUE, label TEXT NOT NULL, curriculum_note TEXT);
+CREATE TABLE topic_track_grade (topic_id INTEGER REFERENCES topics(id), track TEXT, intro_grade INTEGER NOT NULL, PRIMARY KEY(topic_id, track)); -- absence = not in curriculum
+
+-- Game rules (data-driven)
+CREATE TABLE ladder_levels (level INTEGER PRIMARY KEY, amount INTEGER NOT NULL, is_safe INTEGER NOT NULL DEFAULT 0, tier TEXT NOT NULL, label TEXT);
+CREATE TABLE selection_weights (tier TEXT, k_bucket TEXT CHECK(k_bucket IN ('k0','k1','k2plus')), weight REAL NOT NULL, diff_min INTEGER, diff_max INTEGER, PRIMARY KEY(tier,k_bucket));
+CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, description TEXT);        -- timers, retention, joker probabilities, rate limits
+CREATE TABLE jokers (code TEXT PRIMARY KEY, label TEXT, enabled INTEGER, config_json TEXT);
+CREATE TABLE ranks (id INTEGER PRIMARY KEY, label TEXT, min_xp INTEGER);
+CREATE TABLE badges (id INTEGER PRIMARY KEY, code TEXT UNIQUE, label TEXT, description TEXT, rule_json TEXT, icon TEXT);
+CREATE TABLE phrases (id INTEGER PRIMARY KEY, kind TEXT, tone TEXT, text TEXT);             -- Lumi lines
+CREATE TABLE content_pages (slug TEXT PRIMARY KEY, title TEXT, body_md TEXT, audience TEXT, updated_at TEXT); -- Datenschutz, Impressum, ...
+
+-- Questions
+CREATE TABLE questions (
+  id INTEGER PRIMARY KEY, topic_id INTEGER NOT NULL REFERENCES topics(id), subject_id INTEGER NOT NULL REFERENCES subjects(id),
+  text TEXT NOT NULL, opt_a TEXT NOT NULL, opt_b TEXT NOT NULL, opt_c TEXT NOT NULL, opt_d TEXT NOT NULL,
+  correct_index INTEGER NOT NULL CHECK(correct_index BETWEEN 0 AND 3), explanation TEXT NOT NULL,
+  difficulty INTEGER NOT NULL CHECK(difficulty BETWEEN 1 AND 5),
+  intro_grade_hs INTEGER, intro_grade_rs INTEGER, intro_grade_gy INTEGER,   -- NULL = not in that track's curriculum
+  cluster_id TEXT, media_id INTEGER, source_note TEXT, expires_at TEXT,
+  status TEXT NOT NULL CHECK(status IN ('draft','auto_checked','in_review','published','rejected','retired')),
+  created_by TEXT, prompt_version TEXT, model_version TEXT, reviewed_by INTEGER, reviewed_at TEXT, version INTEGER DEFAULT 1,
+  created_at TEXT, updated_at TEXT
+);
+CREATE INDEX idx_q_select ON questions(status, subject_id, difficulty, intro_grade_gy, intro_grade_rs, intro_grade_hs);
+CREATE TABLE question_stats (question_id INTEGER PRIMARY KEY, answered INTEGER, correct INTEGER, opt_counts_json TEXT); -- anonymous aggregates
+CREATE TABLE question_reports (id INTEGER PRIMARY KEY, question_id INTEGER, reason TEXT, created_at TEXT, handled INTEGER DEFAULT 0); -- no player id stored
+CREATE TABLE media (id INTEGER PRIMARY KEY, path TEXT, alt_text TEXT NOT NULL, license TEXT, source TEXT);
+
+-- Players (pseudonymous)
+CREATE TABLE players (
+  id INTEGER PRIMARY KEY, display_name TEXT NOT NULL, tag TEXT NOT NULL, school_type TEXT NOT NULL REFERENCES school_types(code),
+  grade INTEGER NOT NULL REFERENCES grades(grade), pin_hash TEXT NOT NULL, rescue_hash TEXT NOT NULL, avatar_id INTEGER,
+  xp INTEGER DEFAULT 0, prefs_json TEXT, leaderboard_optin INTEGER DEFAULT 0,
+  failed_logins INTEGER DEFAULT 0, locked_until TEXT, created_at TEXT, last_active_at TEXT,
+  UNIQUE(display_name, tag)
+);
+CREATE TABLE sessions (token_hash TEXT PRIMARY KEY, player_id INTEGER REFERENCES players(id) ON DELETE CASCADE, expires_at TEXT);
+
+-- Gameplay
+CREATE TABLE games (id TEXT PRIMARY KEY, player_id INTEGER REFERENCES players(id) ON DELETE CASCADE, mode TEXT, grade_at_start INTEGER, track TEXT,
+  current_level INTEGER, status TEXT, winnings INTEGER, jokers_json TEXT, started_at TEXT, ended_at TEXT);
+CREATE TABLE game_questions (game_id TEXT REFERENCES games(id) ON DELETE CASCADE, level INTEGER, question_id INTEGER, option_order TEXT, answered_index INTEGER, correct INTEGER, answered_at TEXT, joker_used TEXT, PRIMARY KEY(game_id, level));
+CREATE TABLE seen_questions (player_id INTEGER REFERENCES players(id) ON DELETE CASCADE, question_id INTEGER, last_seen_at TEXT, PRIMARY KEY(player_id, question_id));
+CREATE TABLE review_deck (player_id INTEGER REFERENCES players(id) ON DELETE CASCADE, question_id INTEGER, box INTEGER, due_at TEXT, PRIMARY KEY(player_id, question_id));
+CREATE TABLE player_badges (player_id INTEGER REFERENCES players(id) ON DELETE CASCADE, badge_id INTEGER, earned_at TEXT, PRIMARY KEY(player_id, badge_id));
+CREATE TABLE topic_mastery (player_id INTEGER REFERENCES players(id) ON DELETE CASCADE, topic_id INTEGER, attempts INTEGER, correct INTEGER, PRIMARY KEY(player_id, topic_id));
+
+-- Admin
+CREATE TABLE admin_users (id INTEGER PRIMARY KEY, email TEXT UNIQUE, pw_hash TEXT, totp_secret_enc TEXT, role TEXT CHECK(role IN ('owner','editor','reviewer')), active INTEGER);
+CREATE TABLE audit_log (id INTEGER PRIMARY KEY, admin_id INTEGER, action TEXT, entity TEXT, entity_id TEXT, meta_json TEXT, at TEXT);
+```
+Deleting a player cascades to all gameplay tables (privacy requirement). Aggregates (`question_stats`) never link back to a player.
+
+### 14.6 Key services
+- `SelectionService` (§6) · `GameService` (state machine: created → in_progress → finished/abandoned; idempotent answer handling; server timestamps) · `JokerService` · `ScoringService` (ladder/safe-level math from DB) · `AuthService` · `ReviewService` (Leitner) · `DailyService` (deterministic seed) · `RetentionJob` (nightly: delete inactive accounts, rotate logs, purge abandoned games) · `StatsJob` (percentiles with min-cohort rule).
+
+### 14.7 Security checklist
+argon2id params tuned (≥ 19 MiB, t=2); rate limits; CSRF protection (SameSite + custom header); strict input validation (Zod) on every route; output escaping (no `v-html` without sanitisation); CSP without `unsafe-inline` (nonce/hash for the critical inline snippet only); dependency pinning; secrets via env; admin 2FA; backup restore drill; anti-cheat (server-side answer check, per-question minimum-time sanity flag); no PII in logs; SQL via parameterised Drizzle queries only.
+
+### 14.8 Deployment (Dokploy + Traefik)
+Single container (`api` serving `/` static + `/api`), volume `/data` (SQLite + media), env vars: `NODE_ENV`, `DATABASE_PATH`, `SESSION_SECRET`, `ADMIN_BOOTSTRAP_*`, `LOG_RETENTION_DAYS`, etc. Healthcheck `/healthz`. Traefik: HTTPS redirect, HSTS, security-header middleware, compression. Nightly `sqlite3 .backup` → age-encrypted → EU object storage/VPS; restore documented.
+
+---
+
+## 15. GLM Build Playbook (chat.z.ai)
+
+GLM chats have limited context and can truncate long outputs. Strategy: **never paste the whole PRD for every task; build in small, verifiable phases**, each in a *fresh chat* starting with the stable header below.
+
+### 15.1 Stable header (paste at the start of EVERY GLM chat)
+```text
+ROLE: Senior full-stack engineer. We build "Wissensgipfel", a German-language kids quiz PWA (grades 5–8).
+STACK: Vue 3 + TS + Vite + Pinia + vite-plugin-pwa + GSAP (web); Node 22 + Fastify + TS + Zod + better-sqlite3 + Drizzle + argon2 (api); pnpm monorepo.
+HARD RULES: (1) No hardcoded business values – everything from DB tables or env. (2) No mock data. (3) SQLite only.
+(4) No third-party requests at runtime (self-host fonts/assets). (5) DSGVO: collect only displayName, schoolType, grade, PIN. (6) Correct answers never sent to the client before answering.
+(7) Question eligibility invariant: intro_grade_<track> IS NOT NULL AND <= player grade.
+(8) UI text German ("du"), code/comments English. (9) Output COMPLETE files (no "..." placeholders), with file paths as headings.
+(10) After code: list what to run to verify + what could break.
+CONTEXT: <paste only the PRD sections relevant to this phase>
+TASK: <phase task>
+```
+
+### 15.2 Phases
+
+| Phase | Goal | PRD sections to paste | Acceptance criteria |
+|---|---|---|---|
+| **0 — Scaffold** | Monorepo, TS configs, lint, Docker, CI skeleton, healthcheck | §14.1, 14.2, 14.8 | `pnpm i && pnpm dev` runs web+api; `/healthz` OK |
+| **1 — DB & seeds** | Drizzle schema + migrations, seeds for school types, grades, subjects, ladder, weights, settings, jokers, ranks, content pages (placeholder legal text clearly marked **TO BE REPLACED**) | §5.2, 6.1, 6.3, 14.5 | Migration runs clean; seeds idempotent; no constants in code |
+| **2 — Auth** | Register/login/logout/reset/delete/export, argon2, rate limit, handle+tag, rescue code, sessions | §8, 9.3, 14.7 | Unit tests for lockout & no-enumeration; cookies flags verified |
+| **3 — Selection engine** | `SelectionService` + property test harness + fixture questions loaded **via the real import path** (import small real sample set) | §6 | 100k simulated games: 0 invariant violations; diversity rules pass |
+| **4 — Game engine API** | Game state machine, answers, safe levels, walk-away, jokers, switch | §5, 14.4, 14.6 | E2E API tests incl. cheat attempts (replay, skip level, tamper) |
+| **5 — Design system & shell** | Tokens, fonts (self-hosted), base components, layouts, routing, dark/light | §10, 11 | Styleguide page; axe has 0 serious violations |
+| **6 — Onboarding & Home** | Registration wizard, login (PinPad), home, settings | §8.4, 10 | Full flow on phone/tablet viewport; keyboard operable |
+| **7 — Game stage** | Question card, answer plates, ladder, final confirm, reveal, explanation, jokers UI, result | §5, 10.3, 11, 12 | Playable end-to-end vs real API; reduced-motion works |
+| **8 — Motion & sound** | GSAP timelines, Web Audio engine, cues, settings sliders, haptics | §12 | 60 fps on mid device; all sounds have visual equivalent |
+| **9 — Training, Review deck, Daily, Profile** | Leitner logic, mastery, badges, percentile | §5.5, 5.6 | Intervals from DB; min-cohort rule enforced |
+| **10 — PWA** | Manifest, SW, offline page, update flow, install prompt, (v1.1 offline pack) | §14.3 | Lighthouse targets met; offline shell works |
+| **11 — Admin back-office** | Auth+2FA, question CRUD, review queue, import/export, reports, coverage dashboard, settings editors | §7.4, 16 | Roles enforced; audit log written |
+| **12 — Content pipeline** | Generation scripts/prompts, template generators for Mathe, validators, import CLI | §7 | Pipeline dry-run produces valid, deduped, reviewable items |
+| **13 — Hardening & compliance** | CSP, headers, retention jobs, backups, logging policy, legal pages, DSFA doc draft | §9, 14.7 | Security checklist ticked; retention job tested |
+| **14 — Content ramp-up & beta** | Generate/review to launch minimum, closed beta with a few families | §7.4 | Coverage report shows no gaps below minimum |
+
+### 15.3 GLM working rules
+- One phase per chat; at the end ask GLM: *"Summarise the public interfaces (types, routes, table names) you created in ≤ 40 lines"* — paste that summary into the next phase's context instead of the code.
+- If a response is cut off: reply **"Continue from the last complete file; repeat only the last file's header."**
+- Always ask for **tests** with each service (Vitest) and a **verification checklist**.
+- Do not let GLM invent library APIs: when unsure, require it to state the library version and cite the function it uses; run the code and feed errors back verbatim.
+- Keep `docs/RULES.md` (the hard rules) and `docs/AI_RULES.md` in the repo; reference them in each phase.
+
+---
+
+## 16. Admin / content back-office (desktop-first)
+
+- **Auth:** e-mail + password (argon2id) + TOTP; roles `owner` (everything), `editor` (questions), `reviewer` (approve/publish). Session timeout 30 min idle.
+- **Dashboard:** content coverage heatmap (subject × grade × track × difficulty), pool-size alerts, report queue, accuracy outliers (questions < 15 % or > 98 % correct with ≥ 50 answers), active players (anonymous counts only).
+- **Question manager:** list/filter/search, inline edit, side-by-side diff, bulk status change, set intro grades per track (with warning when a question is available to a grade below its topic's intro), duplicate finder, import/export (JSON/CSV), media library with required alt text.
+- **Review queue:** shows machine cross-check result; approve / edit / reject with reason.
+- **Reports:** reasons aggregated per question; one-click "retire" or "send to review".
+- **Rules editors:** ladder, tier weights, jokers, timer defaults, retention, rate limits, Lumi phrases, badges, ranks, content pages (Datenschutz etc.) with versioning (`updated_at`, history).
+- **Compliance panel:** retention job status, last backup, last restore test, DSFA/VVT links.
+- **No player-identifying views:** admins cannot browse individual players' histories (only aggregates); support actions (e.g., delete player on proven request) by handle only, audited.
+
+---
+
+## 17. Testing & QA
+
+| Level | What |
+|---|---|
+| Unit | Scoring/safe-level math, weight renormalisation, Leitner, PIN rules, name filter |
+| **Property/Simulation** | **100k+ simulated games × all (track, grade)**: invariant (§6.2), diversity, no duplicates, tier weights within tolerance, difficulty monotonic trend |
+| API/Integration | Auth flows, rate limits, game lifecycle, cheat attempts, deletion cascade |
+| E2E (Playwright) | Register → play → win/lose/walk-away → review deck → delete account; phone + tablet + desktop viewports |
+| Accessibility | axe in CI, manual screen-reader pass (NVDA/VoiceOver), keyboard-only run |
+| Performance | Lighthouse CI, bundle budgets, 60 fps check on low-end profile |
+| Privacy | Automated check that no network request leaves the origin; cookie audit; log scan for PII; export/delete verification |
+| Content QA | Sample audit by a teacher (≥ 5 % of each batch), report-rate monitoring |
+| Child usability | Test with ≥ 8 children (ages 10–14) across school types before launch; observe PIN memory, reading load, joker comprehension |
+
+---
+
+## 18. NFRs & success metrics
+
+**NFRs:** initial JS ≤ 200 KB gz (route-split), total first-load assets ≤ 1.2 MB incl. fonts & core audio; LCP ≤ 2.5 s on mid-range Android/4G; API p95 ≤ 200 ms; availability ≥ 99.5 %; supports Chrome/Edge/Safari/Firefox current & last 2 major versions, iOS 16.4+ (PWA install), Android 9+.
+
+**Product metrics (first-party, anonymous aggregates only):** completed games per active player/week, D7 return rate (computed from pseudonymous activity without tracking), Training/Review adoption, question accuracy distribution by tier (target: tier A ≈ 85–95 %, B ≈ 60–75 %, C ≈ 35–55 %), report rate < 1 % of answers, registration completion ≥ 85 %, PIN-reset success ≥ 80 %.
+
+---
+
+## 19. Roadmap
+
+| Release | Scope |
+|---|---|
+| **MVP (v1.0)** | Registration/login, Gipfel-Spiel with 4 jokers, Training, Wiederholungsstapel, Tagesquiz, profile/badges, PWA, admin, ≥ 4,000 questions, DSGVO pack |
+| **v1.1** | Offline-Training packs, image questions, read-aloud (Web Speech), Leichte-Sprache help, Gesamtschule Erweiterungsniveau, opt-in leaderboard |
+| **v1.2** | Grades 9–10, Französisch/Latein, more Länder (curriculum variants per Bundesland, optional field) |
+| **v2.0** | Anonymous **class codes** & teacher view (aggregates only), asynchronous duels without chat, seasonal events |
+
+---
+
+## 20. Risks & open decisions
+
+| # | Item | Risk / Question | Proposed handling |
+|---|---|---|---|
+| 1 | Legal basis & parental consent (Art. 6/8 DSGVO) ⚖️ | No e-mail → no verifiable consent | Minimal pseudonymous data + parent info + DSB/lawyer review + DSFA before launch |
+| 2 | "Real name" vs pseudonym | Brief says "isim" | Pseudonym with strong guidance (decide before Phase 2) |
+| 3 | Curriculum accuracy | Wrong grade assignment = children see unseen topics | Human review sets intro grades; "leave out when unsure"; teacher validation of §6.5 map; report button |
+| 4 | Länder differences | v1 NRW-aligned; other states differ | Content flagged NRW; Bundesland optional in v1.2 |
+| 5 | PIN forgotten | No e-mail recovery | Rettungscode + clear onboarding; accept data loss otherwise |
+| 6 | Shared devices | Child logged in on family tablet | Quick player switch, auto-logout option, parent notice |
+| 7 | Content volume & quality | 4,000+ questions need review effort | Template generators for Mathe, GLM cross-check, staged ramp-up, volunteer teacher reviewers |
+| 8 | TV-format trademark | Look/name too close | Original brand (§4); legal check on final name ⚖️ |
+| 9 | GLM output quality/truncation | Inconsistent code | Phased playbook, tests, interface summaries, human code review |
+| 10 | Public leaderboard & bullying | Pseudonyms can still be abused | Off by default, opt-in, name filter, report path |
+| 11 | Audience-joker honesty | Synthetic percentages | Use real stats when ≥ 30 answers; label as "Umfrage unter Mitspielern"; keep unobtrusive |
+| 12 | Sound licensing | Unclear licences | Self-synthesised or CC0 only; `ASSET_LICENSES.md` |
+| 13 | Backups contain deleted data | DSGVO erasure vs backups | ≤ 30-day backup retention, documented in notice |
+| 14 | School-type mapping (GE/SEK) | Mixed-level schools | Map to `mid`; Erweiterungsniveau toggle in v1.1 |
+
+---
+
+### Definition of Done (project level)
+- All §15 phases accepted; §17 test suites green; Lighthouse/axe budgets met.
+- Zero invariant violations in the 100k-game simulation.
+- No outbound third-party requests; cookie audit shows only the session cookie.
+- Legal pages final (not placeholders), DSFA/VVT/TOMs filed, ⚖️ items signed off.
+- Content minimum reached, teacher-sampled QA passed, child usability test completed.

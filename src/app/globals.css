@@ -1,0 +1,304 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================================================
+   WISSENSGIPFEL — "Twilight Summit" Design System
+   A warm twilight mountain world: deep indigo night, golden path, mint/coral states.
+   No TV-show blue stage. Original brand. Self-hosted fonts (OFL).
+   ============================================================================ */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-lexend), system-ui, sans-serif;
+  --font-display: var(--font-baloo), var(--font-lexend), system-ui, sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  /* brand colors */
+  --color-ink: var(--ink);
+  --color-ink-dim: var(--ink-dim);
+  --color-gold: var(--gold);
+  --color-gold-deep: var(--gold-deep);
+  --color-mint: var(--mint);
+  --color-coral: var(--coral);
+  --color-sky: var(--sky);
+  --color-violet: var(--violet);
+  --color-bg0: var(--bg-0);
+  --color-bg1: var(--bg-1);
+  --color-bg2: var(--bg-2);
+}
+
+:root {
+  --radius: 1.125rem;
+
+  /* "Twilight Summit" palette — dark theme is the default (night indigo mountain world) */
+  --bg-0: #12102B;
+  --bg-1: #1C1A44;
+  --bg-2: #2A2766;
+
+  --ink: #F5F3FF;
+  --ink-dim: #BDB8E6;
+
+  --gold: #FFC83D;
+  --gold-deep: #E59A00;
+  --mint: #3DDBA4;
+  --coral: #FF6B7A;
+  --sky: #5CC8FF;
+  --violet: #8B6CFF;
+
+  /* shadcn-mapped tokens (kept aligned with the brand palette) */
+  --background: var(--bg-0);
+  --foreground: var(--ink);
+  --card: var(--bg-1);
+  --card-foreground: var(--ink);
+  --popover: var(--bg-2);
+  --popover-foreground: var(--ink);
+  --primary: var(--gold);
+  --primary-foreground: #1A1238;
+  --secondary: var(--bg-2);
+  --secondary-foreground: var(--ink);
+  --muted: rgba(245, 243, 255, 0.06);
+  --muted-foreground: var(--ink-dim);
+  --accent: var(--bg-2);
+  --accent-foreground: var(--ink);
+  --destructive: var(--coral);
+  --border: rgba(245, 243, 255, 0.12);
+  --input: rgba(245, 243, 255, 0.14);
+  --ring: var(--gold);
+  --chart-1: #8B6CFF;
+  --chart-2: #31B7E6;
+  --chart-3: #F2A93B;
+  --chart-4: #3DDBA4;
+  --chart-5: #FF6B7A;
+  --sidebar: var(--bg-1);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--gold);
+  --sidebar-primary-foreground: #1A1238;
+  --sidebar-accent: var(--bg-2);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: rgba(245, 243, 255, 0.12);
+  --sidebar-ring: var(--gold);
+}
+
+.dark {
+  /* Dark is the default; this block keeps the tokens identical when .dark is applied. */
+  --background: var(--bg-0);
+  --foreground: var(--ink);
+  --card: var(--bg-1);
+  --card-foreground: var(--ink);
+  --popover: var(--bg-2);
+  --popover-foreground: var(--ink);
+  --primary: var(--gold);
+  --primary-foreground: #1A1238;
+  --secondary: var(--bg-2);
+  --secondary-foreground: var(--ink);
+  --muted: rgba(245, 243, 255, 0.06);
+  --muted-foreground: var(--ink-dim);
+  --accent: var(--bg-2);
+  --accent-foreground: var(--ink);
+  --destructive: var(--coral);
+  --border: rgba(245, 243, 255, 0.12);
+  --input: rgba(245, 243, 255, 0.14);
+  --ring: var(--gold);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html, body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "ss01", "ss02";
+  }
+  body {
+    background:
+      radial-gradient(1200px 600px at 50% -10%, rgba(139, 108, 255, 0.18), transparent 60%),
+      radial-gradient(900px 500px at 100% 100%, rgba(92, 200, 255, 0.08), transparent 60%),
+      var(--bg-0);
+    min-height: 100vh;
+  }
+  h1, h2, h3, h4, h5 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+  ::selection {
+    background: rgba(255, 200, 61, 0.35);
+    color: var(--ink);
+  }
+}
+
+/* ============================================================================
+   "Twilight Summit" — Star field background (pure CSS, GPU-cheap)
+   ============================================================================ */
+.starfield::before,
+.starfield::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, rgba(255,255,255,0.85), transparent 50%),
+    radial-gradient(1.5px 1.5px at 27% 64%, rgba(255,255,255,0.7), transparent 50%),
+    radial-gradient(1px 1px at 48% 33%, rgba(255,255,255,0.6), transparent 50%),
+    radial-gradient(1px 1px at 67% 12%, rgba(255,255,255,0.8), transparent 50%),
+    radial-gradient(1.5px 1.5px at 81% 55%, rgba(255,255,255,0.55), transparent 50%),
+    radial-gradient(1px 1px at 92% 28%, rgba(255,255,255,0.7), transparent 50%),
+    radial-gradient(1px 1px at 5% 82%, rgba(255,255,255,0.5), transparent 50%),
+    radial-gradient(1px 1px at 35% 88%, rgba(255,255,255,0.65), transparent 50%);
+  animation: twinkle 6s ease-in-out infinite alternate;
+  z-index: 0;
+}
+.starfield::after {
+  animation-delay: -3s;
+  opacity: 0.55;
+  background-position: 50px 30px;
+}
+@keyframes twinkle {
+  from { opacity: 0.4; }
+  to { opacity: 1; }
+}
+
+/* ============================================================================
+   Mountain silhouette layers (SVG-free, pure CSS via gradients on a div)
+   ============================================================================ */
+.mountains {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 32vh;
+  pointer-events: none;
+  z-index: 0;
+}
+.mountains::before,
+.mountains::after {
+  content: "";
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  bottom: 0;
+  height: 100%;
+  background-repeat: no-repeat;
+  background-position: bottom center;
+  background-size: 100% 100%;
+}
+.mountains::before {
+  /* Far ridge */
+  opacity: 0.55;
+  background-image:
+    linear-gradient(to top, rgba(28, 26, 68, 0.95), rgba(28, 26, 68, 0) 70%),
+    linear-gradient(135deg, transparent 49%, rgba(20, 18, 50, 0.9) 50%);
+  clip-path: polygon(0 100%, 0 70%, 8% 60%, 18% 75%, 28% 50%, 38% 70%, 50% 45%, 62% 65%, 72% 40%, 82% 60%, 92% 50%, 100% 65%, 100% 100%);
+}
+.mountains::after {
+  /* Near ridge — darker, sharper */
+  background:
+    linear-gradient(to top, rgba(18, 16, 43, 0.98), rgba(18, 16, 43, 0) 75%);
+  clip-path: polygon(0 100%, 0 80%, 6% 70%, 15% 82%, 22% 60%, 32% 78%, 42% 55%, 55% 75%, 65% 50%, 75% 70%, 86% 60%, 95% 72%, 100% 65%, 100% 100%);
+}
+
+/* ============================================================================
+   Utility classes — AnswerPlate identities (letter + shape + colour)
+   ============================================================================ */
+.plate-A { --plate-idle: #7C6CFF; }
+.plate-B { --plate-idle: #31B7E6; }
+.plate-C { --plate-idle: #F2A93B; }
+.plate-D { --plate-idle: #E86CB5; }
+
+.plate-glow {
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+}
+.plate-glow-gold {
+  box-shadow: 0 0 24px rgba(255,200,61,.35), 0 8px 24px rgba(0,0,0,.35);
+}
+.plate-glow-mint {
+  box-shadow: 0 0 24px rgba(61,219,164,.35), 0 8px 24px rgba(0,0,0,.35);
+}
+.plate-glow-coral {
+  box-shadow: 0 0 24px rgba(255,107,122,.30), 0 8px 24px rgba(0,0,0,.35);
+}
+
+/* ============================================================================
+   Ladder rail
+   ============================================================================ */
+.ladder-rail .station {
+  transition: transform 220ms ease, color 220ms ease, background 220ms ease;
+}
+.ladder-rail .station.current {
+  color: var(--gold);
+  transform: translateX(-2px);
+}
+.ladder-rail .station.safe {
+  color: var(--mint);
+}
+
+/* ============================================================================
+   Reduced motion preference (also in-app toggle)
+   ============================================================================ */
+@media (prefers-reduced-motion: reduce) {
+  .starfield::before,
+  .starfield::after {
+    animation: none !important;
+  }
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Reusable scrollbar styling for long lists */
+.nice-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 200, 61, 0.35) transparent;
+}
+.nice-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.nice-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 200, 61, 0.35);
+  border-radius: 8px;
+}
+.nice-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 200, 61, 0.55);
+}
+
+/* Big touch-friendly tap target */
+.tap-target {
+  min-height: 48px;
+  min-width: 48px;
+}

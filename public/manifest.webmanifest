@@ -1,0 +1,19 @@
+{
+  "name": "Wissensgipfel — Besteige den Berg des Wissens",
+  "short_name": "Wissensgipfel",
+  "description": "DSGVO-konforme Lern-App für die Klassen 5–8. Klettere die Taler-Leiter hinauf und wiederhole echten Schulstoff.",
+  "start_url": "/?source=pwa",
+  "display": "standalone",
+  "background_color": "#12102B",
+  "theme_color": "#12102B",
+  "lang": "de-DE",
+  "categories": ["education", "games"],
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
