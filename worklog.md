@@ -702,3 +702,63 @@ Stage Summary:
 - All dialogs/modals (final-answer, walk-away, audience, phone) polished with backdrop-blur, bordered pills, neutral palette
 - Reveal card redesigned with gradient + glow + icon box
 - Consistent design language: borders, backdrop-blur, tracking-tight, monospace for numbers, pill-style highlights
+
+
+---
+Task ID: 18
+Agent: orchestrator (GLM Code) — gooey/blob effects system
+Task: Add meta blob effects and reusable gooey filter system for buttons, transitions, and ambient elements
+
+Work Log:
+- User provided the GooeyNav component from reactbits.dev and asked to use its gooey/blob effects as general effects (in/out transitions, buttons, etc.)
+- Analyzed the GooeyNav source (940 lines, WebGL-based) and extracted the core gooey SVG filter technique (feGaussianBlur + feColorMatrix)
+- Created `src/components/ui/gooey.tsx` with 5 reusable components:
+
+  1. **GooeyFilterDefs** — global SVG filter definitions (3 variants: standard, soft, strong)
+     - feGaussianBlur (stdDeviation 5-12) + feColorMatrix (alpha threshold 15-22, offset -6 to -10)
+     - feBlend to composite the gooey result with source
+     - Rendered once in layout.tsx, referenced via `filter: url(#gooey-{variant})`
+
+  2. **GooeyContainer** — wrapper that applies the gooey filter to any children
+
+  3. **GooeyBlob** — a single animated blob with random drift (translate + scale)
+     - 2.5s interval, 2-4s transition, prefers-reduced-motion support
+
+  4. **GooeyButton** — button with liquid blob hover effect
+     - 3 blobs that scale from 0 → 1 on hover with elastic cubic-bezier(0.34, 1.56, 0.64, 1)
+     - Gooey filter applied only on hover (perf optimization)
+     - On press: faster animation (0.2s vs 0.5-0.6s)
+     - 3 size variants (sm/md/lg), 3 gooey variants (standard/soft/strong)
+     - Customizable blob color
+
+  5. **GooeyTransition** — blob morph in/out for screen transitions
+     - 3 blobs that scale from 0 → 1 with staggered delays
+     - Content fades in after blobs merge
+     - Triggered by dependency change
+
+  6. **MetaBlobs** — ambient floating meta blobs for background atmosphere
+     - requestAnimationFrame physics (velocity-based drift, edge bouncing)
+     - Gooey filter applied so blobs merge organically
+     - Configurable count, colors, max size
+     - Muted color palette (rgba(106,122,154,0.12), etc.)
+
+- Applied to landing screen:
+  - MetaBlobs added as ambient background layer (4 blobs, maxSize 180)
+  - Both primary buttons replaced with GooeyButton (liquid blob hover effect)
+  - GooeyFilterDefs added to layout.tsx (global, rendered once)
+
+- Verified with Agent Browser:
+  - Landing renders with meta blobs + gooey buttons
+  - Hover effect works (blobs scale in with elastic ease)
+  - No errors (only harmless THREE.Clock deprecation warning)
+  - Lint: 0 errors, 0 warnings
+  - Server: HTTP 200
+
+Stage Summary:
+- Reusable gooey filter system created — 3 SVG filter variants (standard/soft/strong)
+- GooeyButton replaces standard buttons with liquid blob hover effect
+- MetaBlobs adds ambient floating gooey blobs to background
+- GooeyTransition ready for screen transitions (blob morph in/out)
+- All effects use the classic feGaussianBlur + feColorMatrix technique
+- prefers-reduced-motion fully supported
+- Neutral muted color palette maintained

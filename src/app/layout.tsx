@@ -3,6 +3,7 @@ import { Baloo_2, Lexend } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
+import { GooeyFilterDefs } from "@/components/ui/gooey";
 
 const baloo = Baloo_2({
   variable: "--font-baloo",
@@ -66,6 +67,7 @@ export default function RootLayout({
       <body
         className={`${baloo.variable} ${lexend.variable} antialiased bg-background text-foreground`}
       >
+        <GooeyFilterDefs />
         {children}
         <Toaster />
         <SonnerToaster position="top-center" />

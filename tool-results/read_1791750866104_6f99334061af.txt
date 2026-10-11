@@ -1,0 +1,941 @@
+     1→'use client';
+     2→
+     3→import {
+     4→  useEffect,
+     5→  useLayoutEffect,
+     6→  useRef,
+     7→  useState,
+     8→  type CSSProperties,
+     9→  type MouseEvent,
+    10→  type ReactNode
+    11→} from 'react';
+    12→
+    13→const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+    14→
+    15→type Palette = 'dark' | 'light';
+    16→type Size = 'sm' | 'md' | 'lg';
+    17→type Rgba = number[];
+    18→
+    19→export interface GooeyNavItem {
+    20→  label?: string;
+    21→  href?: string;
+    22→  icon?: ReactNode;
+    23→}
+    24→
+    25→interface GooeyNavProps {
+    26→  items?: GooeyNavItem[];
+    27→  initialActiveIndex?: number;
+    28→  activeIndex?: number;
+    29→  onChange?: (index: number, item: GooeyNavItem) => void;
+    30→  theme?: Palette;
+    31→  color?: string;
+    32→  activeTextColor?: string;
+    33→  colors?: string[];
+    34→  size?: Size;
+    35→  frame?: boolean;
+    36→  animationTime?: number;
+    37→  particleCount?: number;
+    38→  timeVariance?: number;
+    39→  spread?: number;
+    40→  gooeyness?: number;
+    41→  wobble?: number;
+    42→  hoverEffect?: boolean;
+    43→  className?: string;
+    44→  style?: CSSProperties;
+    45→}
+    46→
+    47→interface Rect {
+    48→  x: number;
+    49→  y: number;
+    50→  w: number;
+    51→  h: number;
+    52→}
+    53→
+    54→interface PillState {
+    55→  mass: number;
+    56→  scale: number;
+    57→  velocity: number;
+    58→  outgoing: number;
+    59→}
+    60→
+    61→interface Drop {
+    62→  x: number;
+    63→  y: number;
+    64→  vx: number;
+    65→  vy: number;
+    66→  mass: number;
+    67→  size: number;
+    68→  given: number;
+    69→  source: number;
+    70→  index: number;
+    71→  leave: number;
+    72→  emerged: number;
+    73→  absorbed: number;
+    74→  state: 'waiting' | 'flying' | 'absorbing';
+    75→  tint: Rgba | null;
+    76→  start?: number;
+    77→  duration?: number;
+    78→  path?: number[];
+    79→}
+    80→
+    81→interface Box {
+    82→  cx: number;
+    83→  cy: number;
+    84→  hw: number;
+    85→  hh: number;
+    86→}
+    87→
+    88→interface Blob {
+    89→  x: number;
+    90→  y: number;
+    91→  r: number;
+    92→  tx: number;
+    93→  ty: number;
+    94→  tint: Rgba | null;
+    95→}
+    96→
+    97→interface Pipeline {
+    98→  program: WebGLProgram;
+    99→  uniforms: Record<string, WebGLUniformLocation | null>;
+   100→  buffer: WebGLBuffer;
+   101→  position: number;
+   102→}
+   103→
+   104→const THEMES: Record<Palette, Record<string, string>> = {
+   105→  dark: {
+   106→    '--gn-frame': 'rgba(38, 35, 46, 0.66)',
+   107→    '--gn-frame-edge': 'rgba(255, 255, 255, 0.08)',
+   108→    '--gn-frame-highlight': 'rgba(255, 255, 255, 0.07)',
+   109→    '--gn-frame-shadow': '0 22px 44px -20px rgba(0, 0, 0, 0.8), 0 6px 16px -8px rgba(0, 0, 0, 0.5)',
+   110→    '--gn-ink': '#f4f4f5',
+   111→    '--gn-muted': 'rgba(244, 244, 245, 0.62)'
+   112→  },
+   113→  light: {
+   114→    '--gn-frame': 'rgba(240, 240, 243, 0.8)',
+   115→    '--gn-frame-edge': 'rgba(24, 24, 27, 0.07)',
+   116→    '--gn-frame-highlight': 'rgba(255, 255, 255, 0.95)',
+   117→    '--gn-frame-shadow': '0 22px 44px -22px rgba(24, 24, 27, 0.3), 0 6px 16px -10px rgba(24, 24, 27, 0.16)',
+   118→    '--gn-ink': '#27272a',
+   119→    '--gn-muted': 'rgba(39, 39, 42, 0.62)'
+   120→  }
+   121→};
+   122→
+   123→const PILLS: Record<Palette, { color: string; hover: string; shadow: number }> = {
+   124→  dark: { color: '#f4f4f5', hover: 'rgba(255, 255, 255, 0.08)', shadow: 0.4 },
+   125→  light: { color: '#27272a', hover: 'rgba(24, 24, 27, 0.06)', shadow: 0.2 }
+   126→};
+   127→
+   128→const SIZES: Record<Size, Record<string, string>> = {
+   129→  sm: { '--gn-pad': '5px', '--gn-gap': '2px', '--gn-font': '13px', '--gn-x': '13px', '--gn-y': '7px' },
+   130→  md: { '--gn-pad': '6px', '--gn-gap': '4px', '--gn-font': '14px', '--gn-x': '16px', '--gn-y': '9px' },
+   131→  lg: { '--gn-pad': '7px', '--gn-gap': '6px', '--gn-font': '16px', '--gn-x': '20px', '--gn-y': '11px' }
+   132→};
+   133→
+   134→const ROOT = 'relative inline-flex max-w-full text-[length:var(--gn-font)] leading-[1.2]';
+   135→const FRAMED =
+   136→  'rounded-full p-[var(--gn-pad)] backdrop-blur-[20px] backdrop-saturate-[1.6] [background:var(--gn-frame)] [box-shadow:var(--gn-frame-shadow)]';
+   137→const LIST_BASE = 'm-0 flex list-none flex-wrap gap-[var(--gn-gap)] p-0';
+   138→const LIST = `relative ${LIST_BASE}`;
+   139→const OVERLAY = `${LIST_BASE} pointer-events-none invisible absolute inset-0 text-[var(--gn-active-ink)] [clip-path:inset(100%)]`;
+   140→const LINK_BASE =
+   141→  'inline-flex items-center gap-2 whitespace-nowrap rounded-full border-none bg-transparent px-[var(--gn-x)] py-[var(--gn-y)] [font-family:inherit] [font-size:inherit] [line-height:inherit] font-medium no-underline';
+   142→const LINK = `${LINK_BASE} cursor-pointer text-[var(--gn-muted)] transition-colors duration-200 [-webkit-tap-highlight-color:transparent] group-data-[active]:text-[var(--gn-ink)] hover:text-[var(--gn-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--gn-ink)]`;
+   143→const GHOST = `${LINK_BASE} text-inherit`;
+   144→const ICON = 'inline-flex flex-none [&_svg]:h-[1.15em] [&_svg]:w-[1.15em]';
+   145→const RIM =
+   146→  'pointer-events-none absolute inset-0 rounded-[inherit] [box-shadow:inset_0_0_0_1px_var(--gn-frame-edge),inset_0_1px_0_var(--gn-frame-highlight)]';
+   147→
+   148→const DEFAULT_ITEMS: GooeyNavItem[] = [
+   149→  { label: 'Home', href: '#' },
+   150→  { label: 'Work', href: '#' },
+   151→  { label: 'About', href: '#' },
+   152→  { label: 'Contact', href: '#' }
+   153→];
+   154→
+   155→const MAX_DROPS = 32;
+   156→const MAX_PILLS = 4;
+   157→const MARGIN = 72;
+   158→
+   159→const VERTEX = `#version 300 es
+   160→in vec2 aPosition;
+   161→void main() {
+   162→  gl_Position = vec4(aPosition, 0.0, 1.0);
+   163→}
+   164→`;
+   165→
+   166→const FRAGMENT = `#version 300 es
+   167→precision highp float;
+   168→
+   169→uniform vec2 uSize;
+   170→uniform float uRatio;
+   171→uniform vec4 uPills[${MAX_PILLS}];
+   172→uniform vec4 uHover;
+   173→uniform vec4 uDrops[${MAX_DROPS}];
+   174→uniform vec2 uTails[${MAX_DROPS}];
+   175→uniform vec3 uTints[${MAX_DROPS}];
+   176→uniform int uCount;
+   177→uniform float uSmooth;
+   178→uniform vec3 uPill;
+   179→uniform vec4 uHoverColor;
+   180→uniform float uShadow;
+   181→
+   182→out vec4 outColor;
+   183→
+   184→float sdPill(vec2 p, vec4 box) {
+   185→  vec2 extent = max(box.zw, vec2(0.0));
+   186→  float r = min(extent.x, extent.y);
+   187→  vec2 q = abs(p - box.xy) - extent + r;
+   188→  return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
+   189→}
+   190→
+   191→float sdCapsule(vec2 p, vec2 a, vec2 b, float r) {
+   192→  vec2 pa = p - a;
+   193→  vec2 ba = b - a;
+   194→  float h = clamp(dot(pa, ba) / max(dot(ba, ba), 0.0001), 0.0, 1.0);
+   195→  return length(pa - ba * h) - r;
+   196→}
+   197→
+   198→vec4 blend(vec4 a, vec4 b, float k) {
+   199→  float h = clamp(0.5 + 0.5 * (b.w - a.w) / k, 0.0, 1.0);
+   200→  return vec4(mix(b.rgb, a.rgb, h), mix(b.w, a.w, h) - k * h * (1.0 - h));
+   201→}
+   202→
+   203→vec4 field(vec2 p) {
+   204→  vec4 shape = vec4(uPill, 1e5);
+   205→  for (int i = 0; i < ${MAX_PILLS}; i++) {
+   206→    vec4 pill = uPills[i];
+   207→    if (pill.z <= 0.0) continue;
+   208→    shape = blend(shape, vec4(uPill, sdPill(p, pill)), uSmooth);
+   209→  }
+   210→  for (int i = 0; i < ${MAX_DROPS}; i++) {
+   211→    if (i >= uCount) break;
+   212→    vec4 drop = uDrops[i];
+   213→    if (drop.z <= 0.0) continue;
+   214→    float d = sdCapsule(p, drop.xy, drop.xy - uTails[i], drop.z);
+   215→    if (d > shape.w + uSmooth) continue;
+   216→    shape = blend(shape, vec4(uTints[i], d), uSmooth);
+   217→  }
+   218→  return shape;
+   219→}
+   220→
+   221→void main() {
+   222→  vec2 p = vec2(gl_FragCoord.x, uSize.y * uRatio - gl_FragCoord.y) / uRatio;
+   223→  vec4 shape = field(p);
+   224→  float d = shape.w;
+   225→  float aa = max(fwidth(d), 0.35);
+   226→  float body = clamp(0.5 - d / aa, 0.0, 1.0);
+   227→
+   228→  vec2 grad = vec2(dFdx(d), -dFdy(d));
+   229→  vec2 n = length(grad) > 0.0001 ? normalize(grad) : vec2(0.0, 1.0);
+   230→  float rim = (1.0 - smoothstep(0.0, 1.6, -d)) * max(0.0, -n.y) * 0.3;
+   231→  vec3 fill = mix(shape.rgb, vec3(1.0), rim) * (1.0 - 0.06 * max(0.0, n.y) * (1.0 - smoothstep(0.0, 6.0, -d)));
+   232→
+   233→  float lifted = field(p - vec2(0.0, 3.0)).w;
+   234→  float shadow = (1.0 - smoothstep(-3.0, 9.0, lifted)) * uShadow * (1.0 - body);
+   235→
+   236→  float hover = clamp(0.5 - sdPill(p, uHover) / aa, 0.0, 1.0) * uHoverColor.a;
+   237→
+   238→  vec4 color = vec4(0.0, 0.0, 0.0, shadow);
+   239→  color = vec4(uHoverColor.rgb * hover, hover) + color * (1.0 - hover);
+   240→  color = vec4(fill * body, body) + color * (1.0 - body);
+   241→  outColor = color;
+   242→}
+   243→`;
+   244→
+   245→const parse = (value: string): Rgba => {
+   246→  const match = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(value).trim());
+   247→  if (match) {
+   248→    const hex = match[1].length === 3 ? match[1].replace(/./g, digit => digit + digit) : match[1];
+   249→    return [0, 2, 4].map(index => parseInt(hex.slice(index, index + 2), 16) / 255).concat(1);
+   250→  }
+   251→  const rgba = /rgba?\(([^)]+)\)/i.exec(String(value));
+   252→  if (rgba) {
+   253→    const parts = rgba[1].split(',').map(part => parseFloat(part));
+   254→    return [parts[0] / 255, parts[1] / 255, parts[2] / 255, parts[3] ?? 1];
+   255→  }
+   256→  return [1, 1, 1, 1];
+   257→};
+   258→
+   259→const contrastInk = (rgb: Rgba) => (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2] > 0.55 ? '#18161d' : '#ffffff');
+   260→
+   261→const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+   262→
+   263→const travelEase = (t: number) => {
+   264→  const x = clamp01(t);
+   265→  return x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2;
+   266→};
+   267→
+   268→const bezier = (a: number, b: number, c: number, d: number, t: number) => {
+   269→  const u = 1 - t;
+   270→  return u * u * u * a + 3 * u * u * t * b + 3 * u * t * t * c + t * t * t * d;
+   271→};
+   272→
+   273→const pillPath = (x: number, y: number, w: number, h: number) => {
+   274→  if (w <= 0.5 || h <= 0.5) return '';
+   275→  const r = Math.min(w, h) / 2;
+   276→  return `M${x + r},${y}H${x + w - r}A${r},${r} 0 0 1 ${x + w},${y + r}V${y + h - r}A${r},${r} 0 0 1 ${x + w - r},${y + h}H${x + r}A${r},${r} 0 0 1 ${x},${y + h - r}V${y + r}A${r},${r} 0 0 1 ${x + r},${y}Z`;
+   277→};
+   278→
+   279→const compile = (gl: WebGL2RenderingContext, type: number, source: string) => {
+   280→  const shader = gl.createShader(type) as WebGLShader;
+   281→  gl.shaderSource(shader, source);
+   282→  gl.compileShader(shader);
+   283→  return shader;
+   284→};
+   285→
+   286→const UNIFORMS = [
+   287→  'uSize',
+   288→  'uRatio',
+   289→  'uPills',
+   290→  'uHover',
+   291→  'uDrops',
+   292→  'uTails',
+   293→  'uTints',
+   294→  'uCount',
+   295→  'uSmooth',
+   296→  'uPill',
+   297→  'uHoverColor',
+   298→  'uShadow'
+   299→];
+   300→
+   301→const build = (gl: WebGL2RenderingContext): Pipeline | null => {
+   302→  const program = gl.createProgram() as WebGLProgram;
+   303→  gl.attachShader(program, compile(gl, gl.VERTEX_SHADER, VERTEX));
+   304→  gl.attachShader(program, compile(gl, gl.FRAGMENT_SHADER, FRAGMENT));
+   305→  gl.linkProgram(program);
+   306→  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+   307→    gl.deleteProgram(program);
+   308→    return null;
+   309→  }
+   310→  const uniforms = Object.fromEntries(UNIFORMS.map(name => [name, gl.getUniformLocation(program, name)]));
+   311→  const buffer = gl.createBuffer() as WebGLBuffer;
+   312→  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+   313→  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+   314→  return { program, uniforms, buffer, position: gl.getAttribLocation(program, 'aPosition') };
+   315→};
+   316→
+   317→const GooeyNav = ({
+   318→  items = DEFAULT_ITEMS,
+   319→  initialActiveIndex = 0,
+   320→  activeIndex,
+   321→  onChange,
+   322→  theme = 'dark',
+   323→  color,
+   324→  activeTextColor,
+   325→  colors = [],
+   326→  size = 'md',
+   327→  frame = true,
+   328→  animationTime = 600,
+   329→  particleCount = 15,
+   330→  timeVariance = 300,
+   331→  spread = 56,
+   332→  gooeyness = 0.5,
+   333→  wobble = 0.5,
+   334→  hoverEffect = true,
+   335→  className = '',
+   336→  style
+   337→}: GooeyNavProps) => {
+   338→  const [innerIndex, setInnerIndex] = useState(initialActiveIndex);
+   339→  const current = Math.min(Math.max(0, activeIndex ?? innerIndex), Math.max(0, items.length - 1));
+   340→  const stageRef = useRef<HTMLDivElement>(null);
+   341→  const canvasRef = useRef<HTMLCanvasElement>(null);
+   342→  const listRef = useRef<HTMLUListElement>(null);
+   343→  const overlayRef = useRef<HTMLUListElement>(null);
+   344→  const fallbackRef = useRef<HTMLSpanElement>(null);
+   345→  const engineRef = useRef<{ go: (index: number) => void; refresh: () => void } | null>(null);
+   346→  const indexRef = useRef(current);
+   347→  indexRef.current = current;
+   348→  const palette = theme === 'light' ? 'light' : 'dark';
+   349→  const pillColor = color || PILLS[palette].color;
+   350→  const pillRgb = parse(pillColor);
+   351→  const settings = {
+   352→    animationTime,
+   353→    particleCount,
+   354→    timeVariance,
+   355→    spread,
+   356→    gooeyness,
+   357→    wobble,
+   358→    hoverEffect,
+   359→    pillRgb,
+   360→    tints: colors.map(parse),
+   361→    hoverRgb: parse(PILLS[palette].hover),
+   362→    shadow: PILLS[palette].shadow
+   363→  };
+   364→  const settingsRef = useRef(settings);
+   365→  settingsRef.current = settings;
+   366→
+   367→  const select = (index: number) => {
+   368→    if (index === current) return;
+   369→    if (activeIndex === undefined) setInnerIndex(index);
+   370→    onChange?.(index, items[index]);
+   371→  };
+   372→
+   373→  useIsomorphicLayoutEffect(() => {
+   374→    const stage = stageRef.current;
+   375→    const canvas = canvasRef.current;
+   376→    const list = listRef.current;
+   377→    const overlay = overlayRef.current;
+   378→    const fallback = fallbackRef.current;
+   379→    if (!stage || !canvas || !list || !overlay || !fallback) return;
+   380→
+   381→    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+   382→    const gl = canvas.getContext('webgl2', { alpha: true, premultipliedAlpha: true, antialias: false });
+   383→    const pipeline = gl ? build(gl) : null;
+   384→    fallback.style.display = pipeline ? 'none' : 'block';
+   385→    canvas.style.display = pipeline ? 'block' : 'none';
+   386→
+   387→    const view = { width: 0, height: 0 };
+   388→    let rects: Rect[] = [];
+   389→    let target = -1;
+   390→    const pills = new Map<number, PillState>();
+   391→    const drops: Drop[] = [];
+   392→    const hover = { x: 0, y: 0, w: 0, h: 0, alpha: 0, index: -1 };
+   393→    const pillData = new Float32Array(MAX_PILLS * 4);
+   394→    const dropData = new Float32Array(MAX_DROPS * 4);
+   395→    const tailData = new Float32Array(MAX_DROPS * 2);
+   396→    const tintData = new Float32Array(MAX_DROPS * 3);
+   397→    let raf = 0;
+   398→    let last = 0;
+   399→    let disposed = false;
+   400→
+   401→    const measure = () => {
+   402→      const box = stage.getBoundingClientRect();
+   403→      const ratio = Math.min(window.devicePixelRatio || 1, 2);
+   404→      view.width = box.width;
+   405→      view.height = box.height;
+   406→      const outerWidth = box.width + MARGIN * 2;
+   407→      const outerHeight = box.height + MARGIN * 2;
+   408→      Object.assign(canvas.style, {
+   409→        left: `${-MARGIN}px`,
+   410→        top: `${-MARGIN}px`,
+   411→        width: `${outerWidth}px`,
+   412→        height: `${outerHeight}px`
+   413→      });
+   414→      const width = Math.max(1, Math.round(outerWidth * ratio));
+   415→      const height = Math.max(1, Math.round(outerHeight * ratio));
+   416→      if (canvas.width !== width || canvas.height !== height) {
+   417→        canvas.width = width;
+   418→        canvas.height = height;
+   419→      }
+   420→      rects = Array.from(list.children).map(item => {
+   421→        const rect = item.getBoundingClientRect();
+   422→        return { x: rect.left - box.left, y: rect.top - box.top, w: rect.width, h: rect.height };
+   423→      });
+   424→    };
+   425→
+   426→    const trace = (boxes: Box[], blobs: Blob[], smooth: number) => {
+   427→      const field = (x: number, y: number) => {
+   428→        let d = 1e5;
+   429→        const merge = (value: number) => {
+   430→          const h = clamp01(0.5 + (0.5 * (value - d)) / smooth);
+   431→          d = value + (d - value) * h - smooth * h * (1 - h);
+   432→        };
+   433→        for (const box of boxes) {
+   434→          const r = Math.min(box.hw, box.hh);
+   435→          const qx = Math.abs(x - box.cx) - box.hw + r;
+   436→          const qy = Math.abs(y - box.cy) - box.hh + r;
+   437→          merge(Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r);
+   438→        }
+   439→        for (const blob of blobs) {
+   440→          const px = x - blob.x;
+   441→          const py = y - blob.y;
+   442→          const bx = -blob.tx;
+   443→          const by = -blob.ty;
+   444→          const span = bx * bx + by * by;
+   445→          const h = span > 0.0001 ? clamp01((px * bx + py * by) / span) : 0;
+   446→          const value = Math.hypot(px - bx * h, py - by * h) - blob.r;
+   447→          if (value > d + smooth) continue;
+   448→          merge(value);
+   449→        }
+   450→        return d;
+   451→      };
+   452→      const step = 2;
+   453→      const parts: string[] = [];
+   454→      for (let y = 0; y < view.height; y += 1) {
+   455→        const cy = y + 0.5;
+   456→        let previous = field(0, cy);
+   457→        let start: number | null = previous < 0 ? 0 : null;
+   458→        for (let x = step; x <= view.width + step; x += step) {
+   459→          const value = field(Math.min(x, view.width), cy);
+   460→          if (previous < 0 !== value < 0) {
+   461→            const cross = x - step + (step * previous) / (previous - value);
+   462→            if (value < 0) start = cross;
+   463→            else if (start !== null) {
+   464→              parts.push(`M${start.toFixed(1)},${y}H${cross.toFixed(1)}V${y + 1}H${start.toFixed(1)}Z`);
+   465→              start = null;
+   466→            }
+   467→          }
+   468→          previous = value;
+   469→        }
+   470→        if (start !== null) parts.push(`M${start.toFixed(1)},${y}H${view.width}V${y + 1}H${start.toFixed(1)}Z`);
+   471→      }
+   472→      return parts.join('');
+   473→    };
+   474→
+   475→    const pill = (index: number): PillState => {
+   476→      if (!pills.has(index)) pills.set(index, { mass: 0, scale: 0, velocity: 0, outgoing: 0 });
+   477→      return pills.get(index) as PillState;
+   478→    };
+   479→
+   480→    const shape = (index: number, amount: number): Rect | null => {
+   481→      const rect = rects[index];
+   482→      if (!rect || amount <= 0.002) return null;
+   483→      const h = rect.h * Math.min(1.08, 0.42 + 0.58 * Math.sqrt(Math.max(0, amount)));
+   484→      const w = Math.max(h, rect.w * Math.max(0, amount) ** 0.75);
+   485→      return { x: rect.x + rect.w / 2 - w / 2, y: rect.y + rect.h / 2 - h / 2, w, h };
+   486→    };
+   487→
+   488→    const plan = (drop: Drop, index: number, now: number, fresh: boolean) => {
+   489→      const s = settingsRef.current;
+   490→      const rect = rects[index];
+   491→      if (!rect) return;
+   492→      const reach = Math.max(0, s.spread);
+   493→      const ex = rect.x + rect.w / 2 + (Math.random() - 0.5) * rect.w * 0.45;
+   494→      const ey = rect.y + rect.h / 2 + (Math.random() - 0.5) * rect.h * 0.2;
+   495→      const base = Math.max(0.15, s.animationTime / 1000);
+   496→      const variance = (Math.random() - 0.5) * (Math.max(0, s.timeVariance) / 1000);
+   497→      const duration = Math.max(0.15, base * (0.62 + Math.random() * 0.32) + variance * 0.6);
+   498→      const out = Math.random() * Math.PI * 2;
+   499→      const into = Math.random() * Math.PI * 2;
+   500→      const burst = reach * (0.7 + Math.random() * 0.6);
+   501→      const swing = reach * (0.55 + Math.random() * 0.55);
+   502→      const carry = Math.min(duration / 3, 0.12);
+   503→      drop.index = index;
+   504→      drop.start = now;
+   505→      drop.duration = duration;
+   506→      drop.path = [
+   507→        drop.x,
+   508→        drop.y,
+   509→        fresh ? drop.x + Math.cos(out) * burst * 1.6 : drop.x + drop.vx * carry,
+   510→        fresh ? drop.y + Math.sin(out) * burst * 1.6 : drop.y + drop.vy * carry,
+   511→        ex + Math.cos(into) * swing * 1.5,
+   512→        ey + Math.sin(into) * swing * 1.5,
+   513→        ex,
+   514→        ey
+   515→      ];
+   516→    };
+   517→
+   518→    const emit = (from: number, to: number, now: number) => {
+   519→      const s = settingsRef.current;
+   520→      const source = pills.get(from);
+   521→      const rect = rects[from];
+   522→      if (!source || !rect || !rects[to]) return;
+   523→      const available = source.mass - source.outgoing;
+   524→      if (available <= 0.002) return;
+   525→      const room = MAX_DROPS - drops.length;
+   526→      const count = Math.min(room, Math.max(1, Math.round(Math.max(1, s.particleCount) * available)));
+   527→      if (count <= 0) return;
+   528→      const window = Math.max(0.15, s.animationTime / 1000) * 0.16;
+   529→      for (let i = 0; i < count; i++) {
+   530→        const mass = available / count;
+   531→        source.outgoing += mass;
+   532→        drops.push({
+   533→          x: rect.x + rect.w / 2 + (Math.random() - 0.5) * rect.w * 0.6,
+   534→          y: rect.y + rect.h / 2 + (Math.random() - 0.5) * rect.h * 0.3,
+   535→          vx: 0,
+   536→          vy: 0,
+   537→          mass,
+   538→          size: 0.8 + Math.random() * 0.4,
+   539→          given: 0,
+   540→          source: from,
+   541→          index: to,
+   542→          leave: now + Math.random() * window * 1000,
+   543→          emerged: 0,
+   544→          absorbed: 0,
+   545→          state: 'waiting',
+   546→          tint: s.tints.length ? s.tints[Math.floor(Math.random() * s.tints.length)] : null
+   547→        });
+   548→      }
+   549→    };
+   550→
+   551→    const render = () => {
+   552→      const s = settingsRef.current;
+   553→      const height = rects[target]?.h ?? rects[0]?.h ?? 36;
+   554→      const smooth = height * (0.18 + 0.5 * clamp01(s.gooeyness));
+   555→      const boxes: Box[] = [];
+   556→      const blobs: Blob[] = [];
+   557→      for (const [index, state] of pills) {
+   558→        const box = shape(index, state.scale);
+   559→        if (box) boxes.push({ cx: box.x + box.w / 2, cy: box.y + box.h / 2, hw: box.w / 2, hh: box.h / 2 });
+   560→      }
+   561→      for (const drop of drops) {
+   562→        if (drop.state === 'waiting') continue;
+   563→        const radius = 0.26 * height * drop.size * Math.min(drop.emerged, 1 - drop.absorbed);
+   564→        if (radius <= 0.05) continue;
+   565→        const speed = Math.hypot(drop.vx, drop.vy);
+   566→        const length = Math.min(radius * 1.1, speed * 0.018);
+   567→        blobs.push({
+   568→          x: drop.x,
+   569→          y: drop.y,
+   570→          r: radius,
+   571→          tx: speed > 0.01 ? (drop.vx / speed) * length : 0,
+   572→          ty: speed > 0.01 ? (drop.vy / speed) * length : 0,
+   573→          tint: drop.tint
+   574→        });
+   575→      }
+   576→
+   577→      const settledPill = boxes.length === 1 && !blobs.length;
+   578→      if (settledPill) {
+   579→        const box = boxes[0];
+   580→        overlay.style.clipPath = `path('${pillPath(box.cx - box.hw, box.cy - box.hh, box.hw * 2, box.hh * 2)}')`;
+   581→      } else {
+   582→        overlay.style.clipPath = `path('${trace(boxes, blobs, smooth) || 'M0,0Z'}')`;
+   583→      }
+   584→      overlay.style.visibility = 'visible';
+   585→
+   586→      if (!pipeline || !gl) {
+   587→        const box = shape(target, 1);
+   588→        if (box) {
+   589→          fallback.style.transform = `translate(${box.x.toFixed(2)}px, ${box.y.toFixed(2)}px)`;
+   590→          fallback.style.width = `${box.w}px`;
+   591→          fallback.style.height = `${box.h}px`;
+   592→        }
+   593→        fallback.style.opacity = box ? '1' : '0';
+   594→        return;
+   595→      }
+   596→
+   597→      let slot = 0;
+   598→      for (const box of boxes) {
+   599→        if (slot >= MAX_PILLS) break;
+   600→        pillData[slot * 4] = box.cx + MARGIN;
+   601→        pillData[slot * 4 + 1] = box.cy + MARGIN;
+   602→        pillData[slot * 4 + 2] = box.hw;
+   603→        pillData[slot * 4 + 3] = box.hh;
+   604→        slot += 1;
+   605→      }
+   606→      pillData.fill(0, slot * 4);
+   607→      let count = 0;
+   608→      for (const blob of blobs) {
+   609→        if (count >= MAX_DROPS) break;
+   610→        dropData[count * 4] = blob.x + MARGIN;
+   611→        dropData[count * 4 + 1] = blob.y + MARGIN;
+   612→        dropData[count * 4 + 2] = blob.r;
+   613→        dropData[count * 4 + 3] = 0;
+   614→        tailData[count * 2] = blob.tx;
+   615→        tailData[count * 2 + 1] = blob.ty;
+   616→        const tint = blob.tint || s.pillRgb;
+   617→        tintData[count * 3] = tint[0];
+   618→        tintData[count * 3 + 1] = tint[1];
+   619→        tintData[count * 3 + 2] = tint[2];
+   620→        count += 1;
+   621→      }
+   622→
+   623→      const { program, uniforms, buffer, position } = pipeline;
+   624→      gl.viewport(0, 0, canvas.width, canvas.height);
+   625→      gl.clearColor(0, 0, 0, 0);
+   626→      gl.clear(gl.COLOR_BUFFER_BIT);
+   627→      gl.useProgram(program);
+   628→      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+   629→      gl.enableVertexAttribArray(position);
+   630→      gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+   631→      gl.uniform2f(uniforms.uSize, view.width + MARGIN * 2, view.height + MARGIN * 2);
+   632→      gl.uniform1f(uniforms.uRatio, canvas.width / Math.max(1, view.width + MARGIN * 2));
+   633→      gl.uniform4fv(uniforms.uPills, pillData);
+   634→      gl.uniform4f(uniforms.uHover, hover.x + MARGIN, hover.y + MARGIN, hover.w / 2, hover.h / 2);
+   635→      gl.uniform4fv(uniforms.uDrops, dropData);
+   636→      gl.uniform2fv(uniforms.uTails, tailData);
+   637→      gl.uniform3fv(uniforms.uTints, tintData);
+   638→      gl.uniform1i(uniforms.uCount, count);
+   639→      gl.uniform1f(uniforms.uSmooth, smooth);
+   640→      gl.uniform3f(uniforms.uPill, s.pillRgb[0], s.pillRgb[1], s.pillRgb[2]);
+   641→      gl.uniform4f(uniforms.uHoverColor, s.hoverRgb[0], s.hoverRgb[1], s.hoverRgb[2], s.hoverRgb[3] * hover.alpha);
+   642→      gl.uniform1f(uniforms.uShadow, s.shadow);
+   643→      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+   644→    };
+   645→
+   646→    const frame = (now: number) => {
+   647→      raf = 0;
+   648→      const s = settingsRef.current;
+   649→      const dt = Math.min(0.05, (now - last) / 1000 || 0);
+   650→      last = now;
+   651→      const emergeTime = 0.09;
+   652→      const absorbTime = 0.12;
+   653→
+   654→      for (let i = drops.length - 1; i >= 0; i--) {
+   655→        const drop = drops[i];
+   656→        if (drop.state === 'waiting') {
+   657→          if (now < drop.leave) continue;
+   658→          drop.state = 'flying';
+   659→          plan(drop, drop.index, now, true);
+   660→        }
+   661→        if (drop.state === 'flying') {
+   662→          drop.emerged = Math.min(1, drop.emerged + dt / emergeTime);
+   663→          const source = pills.get(drop.source);
+   664→          if (source && drop.given < drop.mass) {
+   665→            const step = Math.min(drop.mass * (dt / emergeTime), drop.mass - drop.given);
+   666→            source.mass = Math.max(0, source.mass - step);
+   667→            source.outgoing = Math.max(0, source.outgoing - step);
+   668→            drop.given += step;
+   669→          }
+   670→          const t = clamp01((now - (drop.start ?? now)) / 1000 / (drop.duration ?? 1));
+   671→          const eased = travelEase(t);
+   672→          const [x0, y0, x1, y1, x2, y2, x3, y3] = drop.path ?? [
+   673→            drop.x,
+   674→            drop.y,
+   675→            drop.x,
+   676→            drop.y,
+   677→            drop.x,
+   678→            drop.y,
+   679→            drop.x,
+   680→            drop.y
+   681→          ];
+   682→          const x = bezier(x0, x1, x2, x3, eased);
+   683→          const y = bezier(y0, y1, y2, y3, eased);
+   684→          if (dt > 0) {
+   685→            drop.vx = (x - drop.x) / dt;
+   686→            drop.vy = (y - drop.y) / dt;
+   687→          }
+   688→          drop.x = x;
+   689→          drop.y = y;
+   690→          if (t >= 1) drop.state = 'absorbing';
+   691→        }
+   692→        if (drop.state === 'absorbing') {
+   693→          const step = Math.min(1 - drop.absorbed, dt / absorbTime);
+   694→          drop.absorbed += step;
+   695→          drop.vx *= 0.8;
+   696→          drop.vy *= 0.8;
+   697→          const host = pill(drop.index);
+   698→          host.mass = Math.min(1, host.mass + drop.mass * step);
+   699→          if (drop.absorbed >= 1) drops.splice(i, 1);
+   700→        }
+   701→      }
+   702→
+   703→      const zeta = reduced ? 1 : 1 - 0.72 * clamp01(s.wobble);
+   704→      const omega = 26;
+   705→      const steps = Math.max(1, Math.ceil(dt / (1 / 240)));
+   706→      const h = dt / steps;
+   707→      for (const [index, state] of pills) {
+   708→        for (let n = 0; n < steps; n++) {
+   709→          state.velocity += (omega * omega * (state.mass - state.scale) - 2 * zeta * omega * state.velocity) * h;
+   710→          state.scale += state.velocity * h;
+   711→        }
+   712→        if (index !== target && state.mass <= 0.002 && state.outgoing <= 0.002 && Math.abs(state.scale) < 0.004) {
+   713→          pills.delete(index);
+   714→        }
+   715→      }
+   716→
+   717→      if (hover.index >= 0 && rects[hover.index]) {
+   718→        const rect = rects[hover.index];
+   719→        const k = 1 - Math.exp(-dt / 0.06);
+   720→        hover.x += (rect.x + rect.w / 2 - hover.x) * k;
+   721→        hover.y += (rect.y + rect.h / 2 - hover.y) * k;
+   722→        hover.w += (rect.w - hover.w) * k;
+   723→        hover.h += (rect.h - hover.h) * k;
+   724→      }
+   725→      const hoverGoal = s.hoverEffect && hover.index >= 0 && hover.index !== target ? 1 : 0;
+   726→      hover.alpha += (hoverGoal - hover.alpha) * (1 - Math.exp(-dt / 0.08));
+   727→
+   728→      render();
+   729→
+   730→      const host = pills.get(target);
+   731→      const resting =
+   732→        drops.length === 0 &&
+   733→        pills.size === 1 &&
+   734→        host &&
+   735→        Math.abs(host.mass - host.scale) < 0.0008 &&
+   736→        Math.abs(host.velocity) < 0.004;
+   737→      const hoverRect = rects[hover.index];
+   738→      const hovering =
+   739→        Math.abs(hoverGoal - hover.alpha) > 0.003 ||
+   740→        (hoverRect && Math.abs(hoverRect.x + hoverRect.w / 2 - hover.x) + Math.abs(hoverRect.w - hover.w) > 0.1);
+   741→      if (!resting || hovering) raf = requestAnimationFrame(frame);
+   742→      else {
+   743→        host.mass = 1;
+   744→        host.scale = 1;
+   745→        host.velocity = 0;
+   746→        hover.alpha = hoverGoal;
+   747→        render();
+   748→      }
+   749→    };
+   750→
+   751→    const wake = () => {
+   752→      if (raf || disposed) return;
+   753→      last = performance.now();
+   754→      raf = requestAnimationFrame(frame);
+   755→    };
+   756→
+   757→    const settle = (index: number) => {
+   758→      pills.clear();
+   759→      drops.length = 0;
+   760→      target = index;
+   761→      const state = pill(index);
+   762→      state.mass = 1;
+   763→      state.scale = 1;
+   764→      state.velocity = 0;
+   765→      render();
+   766→    };
+   767→
+   768→    const go = (index: number, animate: boolean) => {
+   769→      if (index === target) return;
+   770→      if (!rects[index] || !animate || reduced || target < 0) {
+   771→        settle(index);
+   772→        return;
+   773→      }
+   774→      const now = performance.now();
+   775→      target = index;
+   776→      pill(index);
+   777→      for (const drop of drops) {
+   778→        drop.index = index;
+   779→        if (drop.state === 'flying') plan(drop, index, now, false);
+   780→        if (drop.state === 'absorbing') {
+   781→          drop.state = 'flying';
+   782→          drop.mass *= 1 - drop.absorbed;
+   783→          drop.absorbed = 0;
+   784→          plan(drop, index, now, false);
+   785→        }
+   786→      }
+   787→      for (const from of [...pills.keys()]) {
+   788→        if (from !== index) emit(from, index, now);
+   789→      }
+   790→      wake();
+   791→    };
+   792→
+   793→    const onOver = (event: PointerEvent) => {
+   794→      const item = (event.target as Element).closest<HTMLElement>('[data-gooey-index]');
+   795→      if (!item || !list.contains(item)) return;
+   796→      const index = Number(item.dataset.gooeyIndex);
+   797→      const rect = rects[index];
+   798→      if (!rect) return;
+   799→      if (hover.alpha < 0.01) {
+   800→        hover.x = rect.x + rect.w / 2;
+   801→        hover.y = rect.y + rect.h / 2;
+   802→        hover.w = rect.w;
+   803→        hover.h = rect.h;
+   804→      }
+   805→      hover.index = index;
+   806→      wake();
+   807→    };
+   808→
+   809→    const onLeave = () => {
+   810→      hover.index = -1;
+   811→      wake();
+   812→    };
+   813→
+   814→    const resizeObserver = new ResizeObserver(() => {
+   815→      measure();
+   816→      if (!drops.length) settle(target < 0 ? indexRef.current : target);
+   817→      else render();
+   818→    });
+   819→    resizeObserver.observe(stage);
+   820→    resizeObserver.observe(list);
+   821→
+   822→    list.addEventListener('pointerover', onOver);
+   823→    list.addEventListener('pointerleave', onLeave);
+   824→
+   825→    measure();
+   826→    settle(indexRef.current);
+   827→    document.fonts?.ready.then(() => {
+   828→      if (disposed) return;
+   829→      measure();
+   830→      if (!drops.length) settle(target);
+   831→    });
+   832→
+   833→    engineRef.current = {
+   834→      go: index => go(index, true),
+   835→      refresh: () => {
+   836→        render();
+   837→        wake();
+   838→      }
+   839→    };
+   840→
+   841→    return () => {
+   842→      disposed = true;
+   843→      cancelAnimationFrame(raf);
+   844→      resizeObserver.disconnect();
+   845→      list.removeEventListener('pointerover', onOver);
+   846→      list.removeEventListener('pointerleave', onLeave);
+   847→      if (gl && pipeline) {
+   848→        gl.deleteBuffer(pipeline.buffer);
+   849→        gl.deleteProgram(pipeline.program);
+   850→      }
+   851→      engineRef.current = null;
+   852→    };
+   853→  }, [items.length]);
+   854→
+   855→  useEffect(() => {
+   856→    engineRef.current?.go(current);
+   857→  }, [current]);
+   858→
+   859→  useEffect(() => {
+   860→    engineRef.current?.refresh();
+   861→  }, [pillColor, palette, gooeyness, size, frame]);
+   862→
+   863→  const textColor = activeTextColor || contrastInk(pillRgb);
+   864→
+   865→  const labels = (interactive: boolean) =>
+   866→    items.map((item, index) => {
+   867→      const content = (
+   868→        <>
+   869→          {item.icon && <span className={ICON}>{item.icon}</span>}
+   870→          {item.label && <span>{item.label}</span>}
+   871→        </>
+   872→      );
+   873→      if (!interactive) {
+   874→        return (
+   875→          <li key={index} className="flex">
+   876→            <span className={GHOST}>{content}</span>
+   877→          </li>
+   878→        );
+   879→      }
+   880→      const shared = {
+   881→        className: LINK,
+   882→        'aria-current': index === current ? ('page' as const) : undefined,
+   883→        onClick: (event: MouseEvent) => {
+   884→          if (!item.href || item.href === '#') event.preventDefault();
+   885→          select(index);
+   886→        }
+   887→      };
+   888→      return (
+   889→        <li
+   890→          key={index}
+   891→          className="group flex"
+   892→          data-gooey-index={index}
+   893→          data-active={index === current ? '' : undefined}
+   894→        >
+   895→          {item.href ? (
+   896→            <a href={item.href} {...shared}>
+   897→              {content}
+   898→            </a>
+   899→          ) : (
+   900→            <button type="button" {...shared}>
+   901→              {content}
+   902→            </button>
+   903→          )}
+   904→        </li>
+   905→      );
+   906→    });
+   907→
+   908→  return (
+   909→    <nav
+   910→      className={`${ROOT}${frame ? ` ${FRAMED}` : ''} ${className}`.trim()}
+   911→      style={
+   912→        {
+   913→          ...(SIZES[size] ?? SIZES.md),
+   914→          ...THEMES[palette],
+   915→          '--gn-pill': pillColor,
+   916→          '--gn-active-ink': textColor,
+   917→          ...style
+   918→        } as CSSProperties
+   919→      }
+   920→    >
+   921→      {frame && <span className={RIM} />}
+   922→      <div ref={stageRef} className="relative max-w-full">
+   923→        <canvas ref={canvasRef} className="pointer-events-none absolute left-0 top-0" aria-hidden="true" />
+   924→        <span
+   925→          ref={fallbackRef}
+   926→          className="pointer-events-none absolute left-0 top-0 hidden rounded-full bg-[var(--gn-pill)]"
+   927→          aria-hidden="true"
+   928→        />
+   929→        <ul ref={listRef} className={LIST}>
+   930→          {labels(true)}
+   931→        </ul>
+   932→        <ul ref={overlayRef} className={OVERLAY} aria-hidden="true">
+   933→          {labels(false)}
+   934→        </ul>
+   935→      </div>
+   936→    </nav>
+   937→  );
+   938→};
+   939→
+   940→export default GooeyNav;
+   941→
