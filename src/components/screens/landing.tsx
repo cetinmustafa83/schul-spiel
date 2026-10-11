@@ -5,6 +5,7 @@ import { Lumi } from "@/components/lumi";
 import { Button } from "@/components/ui/button";
 import { formatTaler } from "@/lib/german";
 import { useScreenTransition } from "@/lib/animations/gsap-hooks";
+import { MountainScene3D } from "@/components/three/mountain-scene";
 import { useEffect, useRef } from "react";
 import { gsap } from "gsap";
 
@@ -14,7 +15,6 @@ export function LandingScreen() {
   const titleRef = useRef<HTMLHeadingElement>(null);
   const lumiRef = useRef<HTMLDivElement>(null);
 
-  // Title glow pulse
   useEffect(() => {
     if (prefs.reducedMotion || !titleRef.current) return;
     const tl = gsap.to(titleRef.current, {
@@ -27,7 +27,6 @@ export function LandingScreen() {
     return () => { tl.kill(); };
   }, [prefs.reducedMotion]);
 
-  // Lumi float
   useEffect(() => {
     if (prefs.reducedMotion || !lumiRef.current) return;
     const tl = gsap.to(lumiRef.current, {
@@ -42,7 +41,11 @@ export function LandingScreen() {
 
   return (
     <div ref={ref} className="relative mx-auto flex min-h-screen max-w-3xl flex-col px-4 py-8 sm:px-6">
-      <header className="flex flex-1 flex-col items-center justify-center text-center">
+      <MountainScene3D
+        className="pointer-events-none fixed inset-0 z-0 opacity-80"
+        reducedMotion={prefs.reducedMotion}
+      />
+      <header className="relative z-10 flex flex-1 flex-col items-center justify-center text-center">
         <div className="mb-6 flex flex-col items-center gap-4">
           <div className="flex items-end gap-2">
             <div ref={lumiRef}>
@@ -83,7 +86,6 @@ export function LandingScreen() {
           </Button>
         </div>
 
-        {/* Feature highlights */}
         <div className="mt-12 grid w-full grid-cols-1 gap-3 sm:grid-cols-3">
           <FeatureCard icon="🦉" title="Lumi hilft dir" text="Unsere Eule gibt dir Tipps — manchmal." />
           <FeatureCard icon="🎯" title="Passend zur Klasse" text="Nur Schulstoff, den du schon kennst." />

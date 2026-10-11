@@ -365,3 +365,88 @@ Stage Summary:
   - Mouse parallax on background layers
 - All animations honour `prefers-reduced-motion` + the in-app toggle.
 - Performance: canvas particles (not DOM), GSAP (not CSS for complex), capped at 60fps.
+
+
+---
+Task ID: 13
+Agent: orchestrator (GLM Code) — professional AAA-grade animation overhaul
+Task: Rebuild all 3D + animations using techniques from threejs-game-skills + Claude-Code-Game-Studios references
+
+Work Log:
+- User feedback: "daha modern animasyonlar, basit degil professionel olmali" (more modern animations, not simple, must be professional) — with two GitHub reference repos.
+- Fetched and studied the threejs-game-skills repo (by Majid Manzarpour):
+  - `threejs-aaa-graphics-builder` SKILL.md + references (authoring-recipes, shader-cookbook, visual-scorecard)
+  - `threejs-gameplay-systems` SKILL.md + references (game-feel)
+  - `threejs-game-ui-designer` SKILL.md
+- Fetched and studied the Claude-Code-Game-Studios repo (by Donchitos): 49 agents, 74 skills, studio hierarchy.
+- Applied the professional techniques from these references:
+
+1. **PBR Render Pipeline** (`src/components/three/mountain-scene.tsx`):
+   - `THREE.SRGBColorSpace` output color space
+   - `THREE.ACESFilmicToneMapping` tone mapping (exposure 1.0)
+   - `PMREMGenerator` + `RoomEnvironment` for IBL (image-based lighting)
+   - DPR capped at 1.5 (mobile-friendly)
+   - `<Environment preset="night">` from drei for PBR reflections
+
+2. **Post-Processing Chain** (EffectComposer):
+   - `RenderPass` (base render)
+   - `UnrealBloomPass` (strength 0.5, radius 0.35, threshold 0.85 — only authored emissive blooms)
+   - Custom `ShaderPass` for vignette (uStrength 0.85, uSize 0.72)
+   - `OutputPass` (tone mapping + sRGB, ALWAYS last)
+   - Composer renders instead of default renderer
+
+3. **Gradient Sky Dome** (custom ShaderMaterial):
+   - BackSide sphere with top/horizon color lerp
+   - Sun disc + halo (pow(d, 800) + pow(d, 8) * 0.25)
+   - No cubemap needed — pure shader
+
+4. **Authored Mountain Geometry** (custom BufferGeometry, NOT cones):
+   - 5 far peaks + 4 near peaks built from triangle strips
+   - Vertex colors: snow (top 70%), rock (mid), dark base
+   - `flatShading` for low-poly aesthetic
+   - `computeVertexNormals()` for proper lighting
+   - PBR materials (roughness 0.85, metalness 0.1, envMapIntensity)
+
+5. **Shader Effects** (via `onBeforeCompile`):
+   - **Beacon pulse**: emissive intensity modulated by `sin(uTime * 2.0)` — scrolling emissive recipe
+   - **Crystal Fresnel rim glow**: `pow(1.0 - dot(normal, viewDir), 3.0)` — fresnel rim recipe
+   - `customProgramCacheKey` set for shader caching
+   - Crystals use `MeshPhysicalMaterial` with transmission (real glass)
+
+6. **Lighting Rig** (key/fill/rim/practical):
+   - Ambient (0.15 intensity, violet)
+   - Key directional (warm gold, from sun direction, 0.8 intensity)
+   - Fill directional (cool sky, opposite side, 0.3 intensity)
+   - Rim directional (violet, behind, 0.4 intensity)
+   - Practical pointLight on beacon (gold, distance 8)
+
+7. **Game-Feel System** (`src/lib/animations/gsap-hooks.ts`):
+   - **ShakeRig**: trauma-based screenshake (trauma² scaling, deterministic pseudoNoise, maxOffset 8px, maxRoll 0.015rad, decay 1.4/s)
+   - **Hitstop**: `triggerHitstop(durationMs, scale)` — scales gameplay delta, keeps render alive
+   - **Squash-and-Stretch**: volume-preserving (`1/sqrt(squashY)`), easeOutBack overshoot
+   - **FOV Punch**: additive FOV bump with exponential decay (`exp(-delta/0.2)`)
+   - **Impact Flash**: full-screen DOM div, opacity 0.5→0 over 120ms
+   - **Pickup Pop**: scale 1.6→1.0 + rise + fade
+   - Correct reveal: squash-stretch + 16 sparkle burst + green impact flash + trauma 0.1
+   - Wrong reveal: 6-step shake + red impact flash + trauma 0.35 + hitstop 80ms
+   - Summit: 150 confetti + trauma 0.7 + impact flash 0.6 + hitstop 150ms
+   - All easings: easeOutBack, easeOutElastic, easeOutCubic
+
+8. **Applied to screens**:
+   - Landing: 3D scene with PBR + post-processing as background
+   - Game stage: question reveal (overshoot + blur-to-clear + elastic stagger), 3D answer plates, mountain ladder
+   - All effects honour `prefers-reduced-motion` + in-app toggle
+
+- Verified with Agent Browser:
+  - Landing renders with 3D PBR scene (no errors)
+  - Login → Home → Game setup → Game stage works
+  - Question reveal animation plays
+  - Answer selection + Final confirm + reveal (correct plate mint) works
+  - Lint: 0 errors, 0 warnings
+  - Server: HTTP 200
+
+Stage Summary:
+- The 3D scene now uses professional AAA techniques: PBR env maps, ACES tone mapping, UnrealBloom, vignette, custom shaders (fresnel rim, scrolling emissive), gradient sky dome, authored BufferGeometry mountains, proper key/fill/rim lighting.
+- Game-feel system implements trauma-based shake, hitstop, squash-stretch, FOV punch, impact flash — the same techniques used in the threejs-game-skills reference demos.
+- All animations degrade gracefully with reduced-motion preference.
+- Performance: DPR capped, single draw call per layer, instanced-ready, canvas particles.
