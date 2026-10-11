@@ -65,37 +65,8 @@ export function LandingScreen() {
           >
             Los geht&apos;s
           </GooeyButton>
-          <p className="mt-3 text-xs text-ink-dim/60">
-            Keine Anmeldung, keine E-Mail. Dein Fortschritt bleibt im Browser gespeichert.
-          </p>
-        </div>
-
-        <div className="mt-12 grid w-full grid-cols-1 gap-3 sm:grid-cols-3">
-          <FeatureCard icon="◆" title="Strategie" text="Nutze Joker klug — jeder zählt." />
-          <FeatureCard icon="▲" title="Lehrplan" text="Echter Schulstoff, passend zur Klasse." />
-          <FeatureCard icon="●" title="Privat" text="Keine E-Mail, kein Tracking." />
         </div>
       </header>
-
-      <footer className="relative z-10 mt-8 flex flex-wrap items-center justify-center gap-4 text-xs text-ink-dim">
-        <button className="hover:text-ink" onClick={() => navigate("legal")}>Datenschutz</button>
-        <span aria-hidden>·</span>
-        <button className="hover:text-ink" onClick={() => navigate("parent-info")}>Eltern-Info</button>
-        <span aria-hidden>·</span>
-        <button className="hover:text-ink" onClick={() => navigate("imprint")}>Impressum</button>
-        <span aria-hidden>·</span>
-        <button className="hover:text-ink" onClick={() => navigate("help")}>Hilfe</button>
-      </footer>
-    </div>
-  );
-}
-
-function FeatureCard({ icon, title, text }: { icon: string; title: string; text: string }) {
-  return (
-    <div className="rounded-xl border border-border bg-bg1/40 p-5 text-center backdrop-blur-md transition-all hover:border-ink-dim/30 hover:bg-bg1/60">
-      <div className="mb-3 text-xl text-ink-dim/70" aria-hidden>{icon}</div>
-      <div className="font-display text-sm font-semibold text-ink">{title}</div>
-      <div className="mt-1.5 text-xs text-ink-dim leading-relaxed">{text}</div>
     </div>
   );
 }
