@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { TOPICS, SUBJECTS, SCHOOL_TYPES, GRADES } from "./curriculum";
 import { QUESTIONS } from "./questions.seed";
+import { LLM_QUESTIONS } from "./llm-questions.seed";
 
 const prisma = new PrismaClient();
 
@@ -544,6 +545,7 @@ async function seedQuestions() {
   await prisma.question.deleteMany({});
 
   let inserted = 0;
+  // Hand-curated seed
   for (const q of QUESTIONS) {
     const topic = await prisma.topic.findUnique({ where: { code: q.topicCode } });
     if (!topic) {
@@ -579,7 +581,39 @@ async function seedQuestions() {
     });
     inserted++;
   }
-  console.log(`  ✓ questions (${inserted} of ${QUESTIONS.length})`);
+  // LLM-generated questions
+  let llmInserted = 0;
+  for (const q of LLM_QUESTIONS) {
+    const topic = await prisma.topic.findUnique({ where: { code: q.topicCode } });
+    if (!topic) continue;
+    const t = TOPICS.find((x) => x.code === q.topicCode);
+    if (!t) continue;
+    await prisma.question.create({
+      data: {
+        topicId: topic.id,
+        subjectId: topic.subjectId,
+        text: q.text,
+        optA: q.options[0],
+        optB: q.options[1],
+        optC: q.options[2],
+        optD: q.options[3],
+        correctIndex: q.correctIndex,
+        explanation: q.explanation,
+        difficulty: q.difficulty,
+        introGradeHs: t.introGradeHs,
+        introGradeRs: t.introGradeRs,
+        introGradeGy: t.introGradeGy,
+        clusterId: q.clusterId ?? null,
+        sourceNote: q.sourceNote,
+        status: "published",
+        createdBy: "llm",
+        version: 1,
+      },
+    });
+    llmInserted++;
+    inserted++;
+  }
+  console.log(`  ✓ questions (${inserted} total: seed=${QUESTIONS.length}, llm=${llmInserted})`);
 }
 
 async function seedQuestionStats() {
