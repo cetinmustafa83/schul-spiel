@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * Wissensgipfel — LLM-based question generation script.
  *
@@ -41,10 +40,11 @@ const GENERATED_FILE = `${import.meta.dir}/llm-questions.seed.ts`;
 function loadExisting(): SeedQuestion[] {
   if (!existsSync(GENERATED_FILE)) return [];
   const content = readFileSync(GENERATED_FILE, "utf-8");
-  const match = content.match(/export const LLM_QUESTIONS: SeedQuestion\[\] = (\[[\s\S]*\]);/);
+  // Match any interface name (SeedQuestion or LLMSeedQuestion) for forward-compat.
+  const match = content.match(/export const LLM_QUESTIONS:\s*\w+\[\]\s*=\s*(\[[\s\S]*\]);/);
   if (!match) return [];
   try {
-    return eval(match[1]); // eslint-disable-line no-eval
+    return JSON.parse(match[1]) as SeedQuestion[];
   } catch {
     return [];
   }

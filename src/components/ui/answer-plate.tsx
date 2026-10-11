@@ -50,6 +50,7 @@ export function AnswerPlate({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      data-answer-plate
       aria-pressed={state === "selected" || state === "locked"}
       aria-label={`Antwort ${letter}: ${text}${state === "correct" ? " (richtig)" : state === "wrong" ? " (falsch)" : ""}`}
       className={cn(
@@ -128,7 +129,7 @@ export function QuestionCard({ subject, level, difficulty, text, timer, children
           {timer}
         </div>
       </div>
-      <h2 className="font-display text-xl sm:text-2xl font-semibold leading-snug text-ink" style={{ fontSize: "clamp(1.15rem, 2vw + 0.6rem, 1.85rem)" }}>
+      <h2 data-question-text className="font-display text-xl sm:text-2xl font-semibold leading-snug text-ink" style={{ fontSize: "clamp(1.15rem, 2vw + 0.6rem, 1.85rem)" }}>
         {text}
       </h2>
       {children}

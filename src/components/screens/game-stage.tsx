@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatTaler, SCHOOL_TYPE_LABELS } from "@/lib/german";
+import { useQuestionReveal, playCorrectReveal, playWrongReveal } from "@/lib/animations/gsap-hooks";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet";
@@ -72,6 +73,9 @@ export function GameStageScreen() {
   const [jokerModal, setJokerModal] = useState<"audience" | "phone" | null>(null);
   const [audiencePoll, setAudiencePoll] = useState<number[] | null>(null);
   const [phoneSuggests, setPhoneSuggests] = useState<{ suggests: number; confidence: string; phrase: string } | null>(null);
+
+  // GSAP question-reveal animation — re-triggers when the level changes.
+  const questionRef = useQuestionReveal<HTMLDivElement>([level, question?.ref]);
 
   const refreshState = useCallback(async () => {
     const res = await fetch(`/api/games/${gameId}`, { cache: "no-store" });
@@ -246,6 +250,7 @@ export function GameStageScreen() {
         {/* Left: question + answers + jokers */}
         <div className="flex flex-col gap-4">
           {question && (
+            <div ref={questionRef}>
             <QuestionCard
               subject={question.subject}
               level={level}
@@ -334,6 +339,7 @@ export function GameStageScreen() {
                 }} gameFinished={gameFinished} revealCorrect={reveal.correct} />
               )}
             </QuestionCard>
+            </div>
           )}
 
           {/* Jokers bar */}
