@@ -114,41 +114,7 @@ export function HomeScreen() {
           accent="from-mint/20"
           onClick={() => navigate("training-setup")}
         />
-        <ModeCard
-          icon={<User className="h-5 w-5" />}
-          title="Profil"
-          subtitle="Statistiken & Abzeichen"
-          accent="from-gold/20"
-          onClick={() => navigate("profile")}
-        />
       </div>
-
-      <div className="mb-6">
-        <button
-          type="button"
-          onClick={() => navigate("legal")}
-          className="flex w-full items-center justify-between rounded-2xl border border-border bg-bg1/40 p-4 text-left hover:bg-bg1/70"
-        >
-          <div className="flex items-center gap-3">
-            <span aria-hidden>🛡️</span>
-            <div>
-              <div className="font-display text-sm font-semibold text-ink">Datenschutz</div>
-              <div className="text-xs text-ink-dim">Deine Daten, deine Rechte</div>
-            </div>
-          </div>
-          <ChevronRight className="h-5 w-5 text-ink-dim" />
-        </button>
-      </div>
-
-      <footer className="mt-auto flex flex-wrap items-center justify-center gap-4 pt-4 text-xs text-ink-dim">
-        <button className="hover:text-ink" onClick={() => navigate("legal")}>Datenschutz</button>
-        <span aria-hidden>·</span>
-        <button className="hover:text-ink" onClick={() => navigate("parent-info")}>Eltern-Info</button>
-        <span aria-hidden>·</span>
-        <button className="hover:text-ink" onClick={() => navigate("imprint")}>Impressum</button>
-        <span aria-hidden>·</span>
-        <button className="hover:text-ink" onClick={() => navigate("help")}>Hilfe</button>
-      </footer>
 
       <button
         type="button"
