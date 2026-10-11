@@ -33,7 +33,6 @@ export function AnswerPlate({
   index,
 }: AnswerPlateProps) {
   const idleColor = IDLE_COLOR[letter];
-  const plateClass = `plate-${letter}`;
   const ref = useRef<HTMLButtonElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const glowRef = useRef<HTMLDivElement>(null);
@@ -45,8 +44,8 @@ export function AnswerPlate({
     const rect = el.getBoundingClientRect();
     const x = (e.clientX - rect.left) / rect.width;
     const y = (e.clientY - rect.top) / rect.height;
-    const rotX = (0.5 - y) * 12;
-    const rotY = (x - 0.5) * 12;
+    const rotX = (0.5 - y) * 8;
+    const rotY = (x - 0.5) * 8;
     gsap.to(innerRef.current, {
       rotateX: rotX,
       rotateY: rotY,
@@ -55,8 +54,8 @@ export function AnswerPlate({
     });
     if (glowRef.current) {
       gsap.to(glowRef.current, {
-        opacity: 0.6,
-        background: `radial-gradient(circle at ${x * 100}% ${y * 100}%, ${idleColor}40, transparent 60%)`,
+        opacity: 0.5,
+        background: `radial-gradient(circle at ${x * 100}% ${y * 100}%, ${idleColor}30, transparent 60%)`,
         duration: 0.15,
       });
     }
@@ -79,23 +78,16 @@ export function AnswerPlate({
     if (disabled || state !== "idle") return;
     // Press-down bounce
     gsap.timeline()
-      .to(innerRef.current, { scale: 0.92, duration: 0.08, ease: "power2.in" })
+      .to(innerRef.current, { scale: 0.94, duration: 0.08, ease: "power2.in" })
       .to(innerRef.current, { scale: 1, duration: 0.4, ease: "elastic.out(1, 0.4)" });
     onClick?.();
   }, [disabled, state, onClick]);
 
-  const bg =
-    state === "correct"
-      ? "bg-mint/20 border-mint"
-      : state === "wrong"
-      ? "bg-coral/20 border-coral"
-      : state === "eliminated"
-      ? "bg-bg2/30 border-border opacity-40 line-through"
-      : state === "selected"
-      ? "bg-bg2 border-gold"
-      : state === "locked"
-      ? "bg-bg2 border-gold"
-      : "bg-bg1/80 border-border hover:border-gold/50";
+  // State-based styling
+  const isActive = state === "selected" || state === "locked";
+  const isCorrect = state === "correct";
+  const isWrong = state === "wrong";
+  const isEliminated = state === "eliminated";
 
   return (
     <button
@@ -106,41 +98,68 @@ export function AnswerPlate({
       onMouseLeave={handleMouseLeave}
       disabled={disabled}
       data-answer-plate
-      aria-pressed={state === "selected" || state === "locked"}
-      aria-label={`Antwort ${letter}: ${text}${state === "correct" ? " (richtig)" : state === "wrong" ? " (falsch)" : ""}`}
+      aria-pressed={isActive}
+      aria-label={`Antwort ${letter}: ${text}${isCorrect ? " (richtig)" : isWrong ? " (falsch)" : ""}`}
       className={cn(
-        "tap-target group relative w-full rounded-2xl border-2 px-4 py-3 sm:py-4 text-left transition-colors duration-200",
-        "min-h-[64px] focus:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-bg0",
-        bg,
-        plateClass,
+        "tap-target group relative w-full min-h-[64px] transition-all duration-200",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg0",
         disabled && state === "idle" && "cursor-not-allowed opacity-60",
       )}
-      style={{ perspective: "800px", borderLeftColor: state === "idle" ? idleColor : undefined, borderLeftWidth: state === "idle" ? 4 : 2 }}
+      style={{ perspective: "800px" }}
     >
       {/* Glow trail overlay */}
       <div
         ref={glowRef}
-        className="pointer-events-none absolute inset-0 rounded-2xl opacity-0"
+        className="pointer-events-none absolute inset-0 opacity-0"
         aria-hidden="true"
       />
 
-      {/* 3D inner content */}
-      <div ref={innerRef} className="relative flex items-center gap-3" style={{ transformStyle: "preserve-3d" }}>
+      {/* 3D inner content — stadium shape with pointed ends (Millionaire-style) */}
+      <div
+        ref={innerRef}
+        className={cn(
+          "relative flex items-center gap-3 px-5 py-3 sm:py-4 transition-colors duration-200",
+        )}
+        style={{
+          transformStyle: "preserve-3d",
+          // Stadium shape with pointed ends using clip-path
+          clipPath: "polygon(8% 0%, 92% 0%, 100% 50%, 92% 100%, 8% 100%, 0% 50%)",
+          background: isCorrect
+            ? "linear-gradient(135deg, rgba(61,219,164,0.15), rgba(61,219,164,0.05))"
+            : isWrong
+            ? "linear-gradient(135deg, rgba(255,107,122,0.15), rgba(255,107,122,0.05))"
+            : isEliminated
+            ? "rgba(20,20,40,0.3)"
+            : isActive
+            ? "linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02))"
+            : "linear-gradient(135deg, rgba(40,38,80,0.6), rgba(28,26,68,0.8))",
+          // Neon glow border via box-shadow
+          boxShadow: isCorrect
+            ? "0 0 16px rgba(61,219,164,0.4), inset 0 0 16px rgba(61,219,164,0.1), 0 8px 24px rgba(0,0,0,0.35)"
+            : isWrong
+            ? "0 0 16px rgba(255,107,122,0.4), inset 0 0 16px rgba(255,107,122,0.1), 0 8px 24px rgba(0,0,0,0.35)"
+            : isActive
+            ? "0 0 20px rgba(255,255,255,0.3), inset 0 0 16px rgba(255,255,255,0.05), 0 8px 24px rgba(0,0,0,0.35)"
+            : "0 0 8px rgba(106,122,154,0.15), inset 0 1px 0 rgba(255,255,255,0.05), 0 8px 24px rgba(0,0,0,0.35)",
+          opacity: isEliminated ? 0.4 : 1,
+          filter: isEliminated ? "blur(2px)" : "none",
+        }}
+      >
         {/* Letter + shape badge */}
         <span
           className={cn(
-            "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg font-bold shadow-lg",
-            state === "correct" && "bg-mint text-bg0",
-            state === "wrong" && "bg-coral text-bg0",
-            state === "eliminated" && "bg-bg2/50 text-ink-dim",
-            state === "idle" && "bg-bg2/70 text-ink",
-            (state === "selected" || state === "locked") && "bg-gold text-bg0",
+            "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base font-bold transition-all",
+            isCorrect && "bg-mint text-bg0",
+            isWrong && "bg-coral text-bg0",
+            isEliminated && "bg-bg2/50 text-ink-dim",
+            state === "idle" && "bg-bg2/60 text-ink",
+            isActive && "bg-ink text-bg0",
           )}
           style={{ color: state === "idle" ? idleColor : undefined, transform: "translateZ(20px)" }}
         >
-          {state === "correct" ? "✓" : state === "wrong" ? "✕" : letter}
+          {isCorrect ? "✓" : isWrong ? "✕" : letter}
         </span>
-        <span className="flex h-5 w-5 shrink-0 items-center justify-center text-sm" style={{ color: idleColor, transform: "translateZ(15px)" }}>
+        <span className="flex h-4 w-4 shrink-0 items-center justify-center text-xs" style={{ color: idleColor, transform: "translateZ(15px)" }}>
           {shape}
         </span>
         <span className="flex-1 text-sm sm:text-base text-ink font-medium leading-tight" style={{ transform: "translateZ(10px)" }}>
@@ -153,13 +172,23 @@ export function AnswerPlate({
         )}
       </div>
 
-      {/* Shine effect on hover for idle state */}
-      {state === "idle" && !disabled && (
-        <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
-          <div
-            className="absolute -inset-y-2 -left-1/2 w-1/3 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 transition-all duration-500 group-hover:translate-x-[400%] group-hover:opacity-100"
-          />
-        </div>
+      {/* Neon border outline (separate element for cleaner stroke) */}
+      {!isEliminated && (
+        <div
+          className="pointer-events-none absolute inset-0 opacity-60"
+          aria-hidden="true"
+          style={{
+            clipPath: "polygon(8% 0%, 92% 0%, 100% 50%, 92% 100%, 8% 100%, 0% 50%)",
+            border: "1px solid",
+            borderColor: isCorrect
+              ? "rgba(61,219,164,0.6)"
+              : isWrong
+              ? "rgba(255,107,122,0.6)"
+              : isActive
+              ? "rgba(255,255,255,0.4)"
+              : "rgba(106,122,154,0.25)",
+          }}
+        />
       )}
     </button>
   );
@@ -183,8 +212,8 @@ export function QuestionCard({ subject, level, difficulty, text, timer, children
     const reducedMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reducedMotion) return;
     gsap.to(ref.current, {
-      boxShadow: "0 12px 32px rgba(255, 200, 61, 0.15), 0 8px 24px rgba(0, 0, 0, 0.35)",
-      duration: 2.5,
+      boxShadow: "0 12px 40px rgba(106,122,154,0.15), 0 0 24px rgba(106,122,154,0.08), 0 8px 24px rgba(0,0,0,0.35)",
+      duration: 3,
       repeat: -1,
       yoyo: true,
       ease: "sine.inOut",
@@ -194,8 +223,13 @@ export function QuestionCard({ subject, level, difficulty, text, timer, children
   return (
     <div
       ref={ref}
-      className="relative rounded-3xl border border-border bg-bg1/80 p-5 sm:p-6 backdrop-blur"
-      style={{ boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)" }}
+      data-question-text
+      className="relative rounded-3xl p-5 sm:p-6 backdrop-blur"
+      style={{
+        background: "linear-gradient(135deg, rgba(40,38,80,0.7), rgba(28,26,68,0.9))",
+        boxShadow: "0 8px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05)",
+        border: "1px solid rgba(106,122,154,0.2)",
+      }}
     >
       <div data-question-header className="mb-3 flex items-center justify-between gap-3 text-xs sm:text-sm">
         <span className="inline-flex items-center gap-2 rounded-full bg-bg2/60 px-3 py-1 font-medium text-ink">
@@ -211,7 +245,7 @@ export function QuestionCard({ subject, level, difficulty, text, timer, children
               {Array.from({ length: 5 }).map((_, i) => (
                 <span
                   key={i}
-                  className={cn("h-2 w-2 rounded-full transition-all", i < difficulty ? "bg-gold" : "bg-border")}
+                  className={cn("h-2 w-2 rounded-full transition-all", i < difficulty ? "bg-ink-dim" : "bg-border")}
                 />
               ))}
             </span>

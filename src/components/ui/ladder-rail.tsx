@@ -75,7 +75,7 @@ function RailLadder({ ladder, currentLevel, className, reducedMotion }: { ladder
 
   return (
     <div className={cn("ladder-rail nice-scroll max-h-[60vh] overflow-y-auto pr-1", className)} aria-label="Taler-Leiter">
-      <ol className="flex flex-col gap-1">
+      <ol className="flex flex-col gap-0.5">
         {steps.map((s) => {
           const isCurrent = s.level === currentLevel;
           const isPast = s.level < currentLevel;
@@ -84,29 +84,43 @@ function RailLadder({ ladder, currentLevel, className, reducedMotion }: { ladder
               key={s.level}
               ref={isCurrent ? currentRef : null}
               className={cn(
-                "station flex items-center justify-between rounded-xl px-3 py-1.5 text-sm transition-all",
-                isCurrent && "current bg-gold/10 border border-gold/40",
+                "station relative flex items-center justify-between rounded-md px-3 py-1.5 text-sm transition-all overflow-hidden",
+                isCurrent && "current",
                 !isCurrent && "border border-transparent",
                 s.isSafe && !isCurrent && "safe"
               )}
-              style={{ transformOrigin: "center" }}
+              style={isCurrent ? {
+                background: "linear-gradient(90deg, rgba(106,122,154,0.25), rgba(106,122,154,0.05))",
+                border: "1px solid rgba(106,122,154,0.4)",
+                boxShadow: "0 0 12px rgba(106,122,154,0.2), inset 0 0 8px rgba(106,122,154,0.08)",
+              } : undefined}
             >
+              {/* Diamond bullet (Millionaire-style) */}
               <span className="flex items-center gap-2">
                 <span
                   className={cn(
-                    "flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-all",
-                    isCurrent ? "bg-gold text-bg0 shadow-[0_0_12px_rgba(255,200,61,0.5)]" : isPast ? "bg-mint/20 text-mint" : s.isSafe ? "bg-mint/20 text-mint" : "bg-bg2/60 text-ink-dim"
+                    "text-[10px] transition-all",
+                    isCurrent ? "text-ink" : isPast ? "text-mint/70" : s.isSafe ? "text-mint/60" : "text-ink-dim/40"
+                  )}
+                  aria-hidden
+                >
+                  ◆
+                </span>
+                <span
+                  className={cn(
+                    "text-xs transition-all",
+                    isCurrent ? "text-ink font-semibold" : isPast ? "text-mint/70" : s.isSafe ? "text-mint/60" : "text-ink-dim/60"
                   )}
                 >
                   {s.level}
                 </span>
-                {s.isSafe && <span aria-hidden>⛺</span>}
-                {s.label && <span className="text-[10px] text-ink-dim">{s.label}</span>}
+                {s.isSafe && <span className="text-[9px] text-mint/60" aria-hidden>⛺</span>}
+                {s.label && <span className="text-[9px] text-ink-dim/50">{s.label}</span>}
               </span>
               <span
                 className={cn(
                   "font-display tabular-nums transition-all",
-                  isCurrent ? "text-gold" : isPast ? "text-mint" : s.isSafe ? "text-mint" : "text-ink-dim"
+                  isCurrent ? "text-ink font-bold" : isPast ? "text-mint/70" : s.isSafe ? "text-mint/60" : "text-ink-dim/70"
                 )}
               >
                 {formatTaler(s.amount)}

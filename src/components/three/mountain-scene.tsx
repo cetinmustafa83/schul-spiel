@@ -482,20 +482,86 @@ function CinematicLighting() {
 }
 
 // ============================================================================
-// Camera rig — slow, smooth dolly
+// Radar Sweep — replaces zoom/dolly with a cinematic radar scan effect
 // ============================================================================
 
-function CinematicCamera({ reducedMotion }: { reducedMotion: boolean }) {
+function RadarSweep() {
+  const sweepRef = useRef<Mesh>(null);
+  const ringRef = useRef<Mesh>(null);
+
   useFrame((state) => {
-    if (reducedMotion) return;
-    const t = state.clock.elapsedTime * 0.03;
-    // Very slow, smooth dolly — no fast motion
-    state.camera.position.x = Math.sin(t) * 1.2;
-    state.camera.position.y = 1.2 + Math.sin(t * 0.5) * 0.2;
-    state.camera.position.z = 4 + Math.cos(t * 0.3) * 0.5;
-    state.camera.lookAt(0, 2, -10);
+    if (!sweepRef.current || !ringRef.current) return;
+    const t = state.clock.elapsedTime;
+    // Slow rotation — one full sweep every 8 seconds
+    sweepRef.current.rotation.z = -t * 0.4;
+    // Pulse the ring
+    const pulse = 1 + Math.sin(t * 1.5) * 0.05;
+    ringRef.current.scale.setScalar(pulse);
   });
-  return null;
+
+  // Custom shader for the radar sweep — a gradient wedge that fades
+  const sweepMaterial = useMemo(() => {
+    return new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      uniforms: {
+        uColor: { value: new THREE.Color(0x4a5568) },
+        uOpacity: { value: 0.12 },
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uColor;
+        uniform float uOpacity;
+        varying vec2 vUv;
+        void main() {
+          // Radial gradient — brighter at center, fades to edge
+          float dist = distance(vUv, vec2(0.5));
+          float alpha = smoothstep(0.5, 0.0, dist) * uOpacity;
+          // Sweep wedge — only show a 60° arc
+          float angle = atan(vUv.y - 0.5, vUv.x - 0.5);
+          float wedge = smoothstep(0.0, 1.0, (angle + 3.14159) / 6.28318);
+          alpha *= smoothstep(0.0, 0.15, wedge) * smoothstep(1.0, 0.85, wedge);
+          gl_FragColor = vec4(uColor, alpha);
+        }
+      `,
+    });
+  }, []);
+
+  return (
+    <group position={[0, 2, -6]} rotation={[0, 0, 0]}>
+      {/* Radar sweep wedge */}
+      <mesh ref={sweepRef} material={sweepMaterial}>
+        <circleGeometry args={[8, 64, 0, Math.PI / 3]} />
+      </mesh>
+      {/* Static ring outline */}
+      <mesh ref={ringRef}>
+        <ringGeometry args={[7.5, 8, 64]} />
+        <meshBasicMaterial color={0x3a4055} transparent opacity={0.15} side={THREE.DoubleSide} />
+      </mesh>
+      {/* Inner ring */}
+      <mesh>
+        <ringGeometry args={[4, 4.1, 64]} />
+        <meshBasicMaterial color={0x3a4055} transparent opacity={0.1} side={THREE.DoubleSide} />
+      </mesh>
+      {/* Crosshair lines */}
+      <mesh rotation={[0, 0, 0]}>
+        <planeGeometry args={[16, 0.03]} />
+        <meshBasicMaterial color={0x3a4055} transparent opacity={0.08} />
+      </mesh>
+      <mesh rotation={[0, 0, Math.PI / 2]}>
+        <planeGeometry args={[16, 0.03]} />
+        <meshBasicMaterial color={0x3a4055} transparent opacity={0.08} />
+      </mesh>
+    </group>
+  );
 }
 
 // ============================================================================
@@ -512,6 +578,7 @@ function Scene({ reducedMotion }: { reducedMotion: boolean }) {
       <AtmosphericFog />
       <GodRays />
       <SummitGlow />
+      {!reducedMotion && <RadarSweep />}
       {!reducedMotion && <AtmosphericParticles count={60} />}
       {!reducedMotion && (
         <Stars
@@ -524,7 +591,6 @@ function Scene({ reducedMotion }: { reducedMotion: boolean }) {
           speed={reducedMotion ? 0 : 0.3}
         />
       )}
-      {!reducedMotion && <CinematicCamera reducedMotion={reducedMotion} />}
     </>
   );
 }

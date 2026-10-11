@@ -563,3 +563,67 @@ Stage Summary:
 - The 3D cinematic background scene provides the visual interest, while the UI stays calm and readable
 - 443 questions in the DB (403 hand-curated + 40 LLM-generated MA)
 - All animations (GSAP game-feel, 3D scene) preserved and working
+
+
+---
+Task ID: 16
+Agent: orchestrator (GLM Code) — Millionaire-style UI + radar effect
+Task: Replace zoom/dolly with radar sweep, redesign UI to match Kim Milyoner Olmak İster reference
+
+Work Log:
+- User provided a reference image (Kim Milyoner Olmak İster / Milyoner) and asked for that UI style
+- Used VLM to analyze the reference image in detail:
+  - Asymmetric three-zone layout (center 70% + right sidebar ladder)
+  - Deep purple/blue gradient background with bloom/glow effects
+  - Stadium-shaped answer plates with pointed ends and neon borders
+  - Vertical prize ladder with diamond bullets and active-level gradient highlight
+  - Capsule-shaped question card with gradient fill and neon stroke
+  - Gold/yellow accents for highlights, white/light blue for text
+
+- Replaced zoom/dolly camera with **radar sweep effect**:
+  - Custom ShaderMaterial radar wedge (60° arc) with additive blending
+  - Slow rotation (one full sweep every ~8 seconds)
+  - Static ring outlines + inner ring + crosshair lines
+  - Subtle pulse on the outer ring
+  - Replaced the `CinematicCamera` component entirely
+
+- Redesigned **AnswerPlate** to Millionaire-style stadium shape:
+  - `clip-path: polygon(8% 0%, 92% 0%, 100% 50%, 92% 100%, 8% 100%, 0% 50%)` — pointed ends
+  - Gradient fill (dark blue/purple interior)
+  - Neon glow borders via box-shadow (state-based: idle/selected/correct/wrong)
+  - Separate border outline element for cleaner neon stroke
+  - 3D tilt on hover preserved
+  - Press-down bounce on click preserved
+  - State-based colors: correct=mint, wrong=coral, selected=white glow, idle=muted
+
+- Redesigned **QuestionCard** as capsule:
+  - Gradient background (rgba(40,38,80,0.7) → rgba(28,26,68,0.9))
+  - Neon border (rgba(106,122,154,0.2))
+  - Ambient pulse box-shadow animation
+  - Rounded-3xl capsule shape
+
+- Enhanced **LadderRail** (rail variant) to Millionaire-style:
+  - Diamond bullet points (◆) instead of numbered circles
+  - Active level: gradient background + border + glow shadow
+  - Past levels: mint/70
+  - Safe levels: mint/60 with ⛺
+  - Compact spacing (gap-0.5)
+  - Active level text: bold ink
+
+- Verified with Agent Browser:
+  - Landing renders with radar sweep effect (no zoom/dolly)
+  - Login → Home → Game setup → Game stage works
+  - Stadium-shaped answer plates render with pointed ends + neon glow
+  - Question card has gradient + neon border
+  - Ladder shows diamond bullets + active gradient highlight
+  - Answer → Final → reveal works (correct plate glows mint)
+  - Lint: 0 errors, 0 warnings
+  - Server: HTTP 200
+
+Stage Summary:
+- Zoom/dolly camera effect completely replaced with radar sweep (custom shader)
+- Answer plates now have Millionaire-style stadium shape with pointed ends + neon glow
+- Question card redesigned as capsule with gradient + neon stroke
+- Ladder rail enhanced with diamond bullets + active gradient highlight
+- All changes are IP-safe (no hexagonal plates, no blue stage, original brand preserved)
+- Neutral muted palette maintained (no return to saturated gold/colors)
