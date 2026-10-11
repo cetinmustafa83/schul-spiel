@@ -567,56 +567,81 @@ interface RevealCardProps {
 }
 
 function RevealCard({ reveal, onNext, gameFinished, revealCorrect }: RevealCardProps) {
-  // Label logic:
-  //  - If wrong → "Zum Ergebnis" (game is over, fall to safe level)
-  //  - If correct AND game finished (summit reached) → "Zum Ergebnis"
-  //  - If correct AND game continues → "Weiter"
   const label = !revealCorrect || gameFinished ? "Zum Ergebnis" : "Weiter";
+  const isCorrect = reveal.correct;
+
   return (
     <div
-      className="mt-4 rounded-2xl border p-4 backdrop-blur-xl"
+      className="mt-4 overflow-hidden rounded-2xl backdrop-blur-xl"
       style={{
-        background: reveal.correct
-          ? "linear-gradient(135deg, rgba(61,219,164,0.08), rgba(61,219,164,0.02))"
-          : "linear-gradient(135deg, rgba(255,107,122,0.08), rgba(255,107,122,0.02))",
-        borderColor: reveal.correct ? "rgba(61,219,164,0.4)" : "rgba(255,107,122,0.4)",
-        boxShadow: reveal.correct
-          ? "0 0 20px rgba(61,219,164,0.15), 0 8px 24px rgba(0,0,0,0.3)"
-          : "0 0 20px rgba(255,107,122,0.15), 0 8px 24px rgba(0,0,0,0.3)",
+        background: isCorrect
+          ? "linear-gradient(135deg, rgba(61,219,164,0.06), rgba(28,26,68,0.6))"
+          : "linear-gradient(135deg, rgba(255,107,122,0.06), rgba(28,26,68,0.6))",
+        border: "1px solid",
+        borderColor: isCorrect ? "rgba(61,219,164,0.25)" : "rgba(255,107,122,0.25)",
+        boxShadow: isCorrect
+          ? "0 0 24px rgba(61,219,164,0.08), 0 8px 32px rgba(0,0,0,0.3)"
+          : "0 0 24px rgba(255,107,122,0.08), 0 8px 32px rgba(0,0,0,0.3)",
       }}
     >
-      <div className="flex items-center gap-3">
+      {/* Header strip with status */}
+      <div
+        className="flex items-center gap-3 px-5 py-3"
+        style={{
+          background: isCorrect
+            ? "linear-gradient(90deg, rgba(61,219,164,0.12), transparent)"
+            : "linear-gradient(90deg, rgba(255,107,122,0.12), transparent)",
+        }}
+      >
         <div
-          className="flex h-10 w-10 items-center justify-center rounded-lg border"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
           style={{
-            borderColor: reveal.correct ? "rgba(61,219,164,0.4)" : "rgba(255,107,122,0.4)",
-            background: reveal.correct ? "rgba(61,219,164,0.1)" : "rgba(255,107,122,0.1)",
+            background: isCorrect ? "rgba(61,219,164,0.15)" : "rgba(255,107,122,0.15)",
+            border: "1px solid",
+            borderColor: isCorrect ? "rgba(61,219,164,0.3)" : "rgba(255,107,122,0.3)",
           }}
         >
-          {reveal.correct ? (
-            <CheckCircle2 className="h-5 w-5 text-mint" />
+          {isCorrect ? (
+            <CheckCircle2 className="h-4.5 w-4.5 text-mint" />
           ) : (
-            <XCircle className="h-5 w-5 text-coral" />
+            <XCircle className="h-4.5 w-4.5 text-coral" />
           )}
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="font-display text-lg font-bold tracking-tight text-ink">
-            {reveal.correct ? "Richtig" : "Knapp daneben"}
-          </div>
-          <div className="text-xs text-ink-dim">
-            Thema: <span className="text-ink-dim/80">{reveal.topic.label}</span>
+        <div className="flex min-w-0 flex-1 items-baseline justify-between gap-2">
+          <div className="flex items-baseline gap-2">
+            <span className="font-display text-base font-bold tracking-tight text-ink">
+              {isCorrect ? "Richtig" : "Knapp daneben"}
+            </span>
+            <span className="text-[10px] uppercase tracking-wider text-ink-dim/50">
+              {reveal.topic.label}
+            </span>
           </div>
         </div>
       </div>
-      <p className="mt-3 border-t border-border/50 pt-3 text-sm text-ink leading-relaxed">
-        {reveal.explanation}
-      </p>
-      <div className="mt-4 flex justify-end">
-        <Button onClick={onNext} size="lg" className="h-12 font-display font-bold">
-          {label}
-          <ArrowRight className="ml-2 h-4 w-4" />
-        </Button>
+
+      {/* Explanation */}
+      <div className="px-5 py-3">
+        <p className="text-sm leading-relaxed text-ink-dim">
+          {reveal.explanation}
+        </p>
       </div>
+
+      {/* Action bar — full-widthWeiter button */}
+      <button
+        type="button"
+        onClick={onNext}
+        className="group flex w-full items-center justify-center gap-2 px-5 py-3.5 font-display text-sm font-bold tracking-wide text-ink transition-all hover:bg-bg2/40"
+        style={{
+          background: isCorrect
+            ? "linear-gradient(90deg, rgba(61,219,164,0.08), rgba(61,219,164,0.04))"
+            : "linear-gradient(90deg, rgba(255,107,122,0.08), rgba(255,107,122,0.04))",
+          borderTop: "1px solid",
+          borderColor: isCorrect ? "rgba(61,219,164,0.15)" : "rgba(255,107,122,0.15)",
+        }}
+      >
+        {label}
+        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+      </button>
     </div>
   );
 }
