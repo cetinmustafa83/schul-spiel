@@ -12,7 +12,7 @@ const startSchema = z.object({
   schoolType: z.string().min(2).max(4),
   grade: z.number().int().min(5).max(8),
   subjectCode: z.string().min(2).max(4),
-  length: z.number().int().min(5).max(25).default(10),
+  length: z.number().int().min(10).max(50).default(20),
 });
 
 export async function POST(req: Request): Promise<NextResponse> {

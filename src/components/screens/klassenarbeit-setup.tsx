@@ -15,14 +15,14 @@ interface Subject {
   color: string | null;
 }
 
-const EXAM_LENGTHS = [10, 15, 20] as const;
+const EXAM_LENGTHS = [20, 30, 45] as const;
 
 export function KlassenarbeitSetupScreen() {
   const { navigate, setPayload, player, pushToast } = useApp();
   const ref = useScreenTransition<HTMLDivElement>();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
-  const [length, setLength] = useState<number>(10);
+  const [length, setLength] = useState<number>(20);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
 
