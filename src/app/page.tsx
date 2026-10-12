@@ -10,6 +10,8 @@ import { GameSetupScreen } from "@/components/screens/game-setup";
 import { GameStageScreen } from "@/components/screens/game-stage";
 import { TrainingSetupScreen } from "@/components/screens/training-setup";
 import { TrainingRunScreen } from "@/components/screens/training-run";
+import { KlassenarbeitSetupScreen } from "@/components/screens/klassenarbeit-setup";
+import { KlassenarbeitRunScreen } from "@/components/screens/klassenarbeit-run";
 import { ReviewScreen } from "@/components/screens/review";
 import { DailyScreen } from "@/components/screens/daily";
 import { ProfileScreen } from "@/components/screens/profile";
@@ -30,6 +32,8 @@ const SCREENS: Record<Screen, React.ComponentType> = {
   "game-stage": GameStageScreen,
   "training-setup": TrainingSetupScreen,
   "training-run": TrainingRunScreen,
+  "klassenarbeit-setup": KlassenarbeitSetupScreen,
+  "klassenarbeit-run": KlassenarbeitRunScreen,
   review: ReviewScreen,
   daily: DailyScreen,
   profile: ProfileScreen,

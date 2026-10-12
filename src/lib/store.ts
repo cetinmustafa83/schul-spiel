@@ -4,12 +4,14 @@ import { create } from "zustand";
 
 export type Screen =
   | "landing"
-  | "onboarding"  // name + schoolType + grade (replaces register/login/reset-pin)
+  | "onboarding"
   | "home"
   | "game-setup"
   | "game-stage"
   | "training-setup"
   | "training-run"
+  | "klassenarbeit-setup"
+  | "klassenarbeit-run"
   | "review"
   | "daily"
   | "profile"

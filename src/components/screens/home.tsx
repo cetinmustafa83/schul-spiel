@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { SCHOOL_TYPE_LABELS, formatTaler } from "@/lib/german";
 import { countDueReview, getPlayer, getGameHistory } from "@/lib/browser-db";
 import {
-  Trophy, Target, Repeat, Calendar, User, Settings, LogOut, ChevronRight,
+  Trophy, Target, Repeat, Calendar, Settings, LogOut, ChevronRight, FileText,
 } from "lucide-react";
 
 export function HomeScreen() {
@@ -113,6 +113,13 @@ export function HomeScreen() {
           subtitle="Wähle ein Fach und übe"
           accent="from-mint/20"
           onClick={() => navigate("training-setup")}
+        />
+        <ModeCard
+          icon={<FileText className="h-5 w-5" />}
+          title="Klassenarbeit"
+          subtitle="Prüfung simulieren"
+          accent="from-sky/20"
+          onClick={() => navigate("klassenarbeit-setup")}
         />
       </div>
 
