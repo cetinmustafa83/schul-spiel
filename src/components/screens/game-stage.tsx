@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useApp } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { AnswerPlate, QuestionCard } from "@/components/ui/answer-plate";
@@ -8,12 +8,12 @@ import { LadderRail, type LadderStep } from "@/components/ui/ladder-rail";
 import { Lumi } from "@/components/lumi";
 import {
   ArrowLeft, ArrowRight, Split, BarChart3, PhoneCall, Shuffle,
-  DoorOpen, X, CheckCircle2, XCircle, Trophy,
+  DoorOpen, X, CheckCircle2, XCircle, Trophy, Timer,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatTaler, SCHOOL_TYPE_LABELS } from "@/lib/german";
 import { useQuestionReveal, playCorrectReveal, playWrongReveal } from "@/lib/animations/gsap-hooks";
-import { sfxLockIn, sfxCorrect, sfxWrong, sfxFiftyFifty, sfxAudience, sfxPhone, sfxSwitch, sfxSafeStation, sfxSummit } from "@/lib/audio/sfx";
+import { sfxLockIn, sfxCorrect, sfxWrong, sfxFiftyFifty, sfxAudience, sfxPhone, sfxSwitch, sfxSafeStation, sfxSummit, sfxTickTack, sfxTimeUp } from "@/lib/audio/sfx";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet";
@@ -77,8 +77,23 @@ export function GameStageScreen() {
   const [audiencePoll, setAudiencePoll] = useState<number[] | null>(null);
   const [phoneSuggests, setPhoneSuggests] = useState<{ suggests: number; confidence: string; phrase: string } | null>(null);
 
+  // Timer state — per-question timer + 40-minute total challenge
+  const timerMode = (payload?.timerMode as string) ?? "off";
+  const [questionTimeLeft, setQuestionTimeLeft] = useState<number | null>(null);
+  const [challengeTimeLeft, setChallengeTimeLeft] = useState<number>(40 * 60); // 40 min in seconds
+  const lastTickRef = useRef<number>(0);
+  const challengeStartRef = useRef<number>(Date.now());
+
+  const questionDuration = timerMode === "relaxed" ? 60 : timerMode === "challenge" ? 30 : null;
+
   // GSAP question-reveal animation — re-triggers when the level changes.
   const questionRef = useQuestionReveal<HTMLDivElement>([level, question?.ref]);
+
+  function formatTime(seconds: number): string {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${String(s).padStart(2, "0")}`;
+  }
 
   const refreshState = useCallback(async () => {
     const res = await fetch(`/api/games/${gameId}`, { cache: "no-store" });
@@ -113,6 +128,49 @@ export function GameStageScreen() {
       }
     })();
   }, [gameId, payload, navigate, refreshState]);
+
+  // Per-question timer: countdown + tick-tack at ≤10s
+  useEffect(() => {
+    if (phase !== "asking" || questionDuration == null) {
+      setQuestionTimeLeft(null);
+      return;
+    }
+    setQuestionTimeLeft(questionDuration);
+
+    const interval = setInterval(() => {
+      setQuestionTimeLeft((prev) => {
+        if (prev == null) return null;
+        const next = prev - 1;
+        if (next <= 10 && next > 0) {
+          sfxTickTack(next <= 3);
+        }
+        if (next <= 0) {
+          sfxTimeUp();
+          setPhase("revealing");
+          return 0;
+        }
+        return next;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [phase, level, questionDuration, question?.ref]);
+
+  // 40-minute total challenge countdown
+  useEffect(() => {
+    if (phase === "ended") return;
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - challengeStartRef.current) / 1000);
+      const remaining = 40 * 60 - elapsed;
+      setChallengeTimeLeft(remaining);
+      if (remaining <= 0) {
+        sfxTimeUp();
+        setEndedReason("walked_away");
+        setPhase("ended");
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [phase]);
 
   async function confirmAnswer() {
     if (selected == null || !question) return;
@@ -277,7 +335,7 @@ export function GameStageScreen() {
   return (
     <div className="mx-auto flex min-h-screen max-w-5xl flex-col px-4 py-4 sm:px-6">
       {/* Top bar */}
-      <header className="mb-4 flex items-center justify-between">
+      <header className="mb-4 flex items-center justify-between gap-2">
         <button
           type="button"
           onClick={() => {
@@ -289,10 +347,32 @@ export function GameStageScreen() {
         >
           <ArrowLeft className="h-4 w-4" /> Verlassen
         </button>
-        <div className="flex items-center gap-2 rounded-full bg-bg2/40 px-4 py-1.5">
-          <span className="text-sm text-ink-dim">Stufe {level} / 15</span>
-          <span className="text-ink-dim/50">·</span>
-          <span className="font-display text-sm font-bold text-ink">{formatTaler(ladder.find((s) => s.level === level)?.amount ?? 0)} Taler</span>
+        <div className="flex items-center gap-2">
+          {/* Per-question timer */}
+          {questionTimeLeft != null && questionTimeLeft > 0 && (
+            <div
+              className={cn(
+                "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-display tabular-nums transition-all",
+                questionTimeLeft <= 10
+                  ? "bg-coral/20 text-coral animate-pulse"
+                  : "bg-bg2/40 text-ink-dim"
+              )}
+            >
+              <Timer className="h-3.5 w-3.5" />
+              {questionTimeLeft}s
+            </div>
+          )}
+          {/* 40-minute challenge timer */}
+          <div className="flex items-center gap-1.5 rounded-full bg-bg2/40 px-3 py-1.5 text-sm font-display tabular-nums text-ink-dim">
+            <Trophy className="h-3.5 w-3.5" />
+            {formatTime(challengeTimeLeft)}
+          </div>
+          {/* Level + Taler */}
+          <div className="flex items-center gap-2 rounded-full bg-bg2/40 px-4 py-1.5">
+            <span className="text-sm text-ink-dim">Stufe {level} / 15</span>
+            <span className="text-ink-dim/50">·</span>
+            <span className="font-display text-sm font-bold text-ink">{formatTaler(ladder.find((s) => s.level === level)?.amount ?? 0)} Taler</span>
+          </div>
         </div>
       </header>
 

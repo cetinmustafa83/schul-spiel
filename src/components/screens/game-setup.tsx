@@ -51,7 +51,7 @@ export function GameSetupScreen() {
         setStarting(false);
         return;
       }
-      setPayload({ gameId: data.gameId, ladder: data.ladder, jokers: data.jokers, timerMode });
+      setPayload({ gameId: data.gameId, ladder: data.ladder, jokers: data.jokers, timerMode, question: data.question });
       navigate("game-stage");
     } catch {
       pushToast("Etwas ist schiefgelaufen.", "error");

@@ -208,3 +208,20 @@ export function sfxSummit() {
 export function sfxButtonPress() {
   playTone(200, 0.04, "square", 0.08);
 }
+
+/** Tick-tack — short click for timer countdown (last 10 seconds). */
+export function sfxTickTack(isUrgent = false) {
+  // Higher pitch + louder when very urgent (≤3s)
+  const freq = isUrgent ? 1200 : 800;
+  const vol = isUrgent ? 0.2 : 0.12;
+  playTone(freq, 0.03, "square", vol);
+}
+
+/** Time's up — buzzer when timer expires. */
+export function sfxTimeUp() {
+  const ctx = getCtx();
+  if (!ctx || !soundEnabled) return;
+  const t = ctx.currentTime;
+  playTone(300, 0.15, "sawtooth", 0.2, t);
+  playTone(250, 0.4, "sawtooth", 0.2, t + 0.1);
+}
