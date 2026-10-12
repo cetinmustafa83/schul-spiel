@@ -900,3 +900,43 @@ Stage Summary:
 - Player data stays in browser localStorage (survives reloads, cleared on cache clear)
 - Questions still come from DB (Prisma/SQLite) — server-side game engine intact
 - Game flow works end-to-end: onboarding → game → answer → reveal → continue
+
+
+---
+Task ID: 21
+Agent: orchestrator (GLM Code) — filtering fix + more questions
+Task: Fix question filtering (school type, grade, subject, difficulty progression) + generate more LLM questions
+
+Work Log:
+- User: "filtreleme düzgün yapilmali, okul tipi, sinif ve eger secildiyse ders onagöre random sorular en kolayindan en zoruna dogru. ayrica diğer dersler için üretim yap"
+
+**Filtering fixes**:
+- Gipfel game API (`/api/games`): already filters by school type (track) + grade via HARD INVARIANT (intro_grade_T ≤ player.grade). Difficulty progression via tiers (A=1-5 easy, B=6-10 medium, C=11-15 hard) + difficultyTarget() monotonically increasing.
+- Training API (`/api/training`): completely rewritten:
+  - Removed auth (getCurrentPlayer) — receives playerName, schoolType, grade from body
+  - Filters by: school type (track) → intro_grade_T column, grade → intro_grade_T ≤ player.grade (HARD INVARIANT), subject (optional) → subject.code in subjectFilter, topic (optional) → topic.code in topicFilter
+  - **NEW: sorts questions by difficulty (easiest to hardest)** — randomize within same difficulty, then stable sort by difficulty
+  - Creates synthetic Player for FK constraint
+- Training answer route (`/api/training/[id]/answer`): removed auth, uses game.currentLevel instead of trainingSession, returns questionId + topicId for LokiJS tracking
+- Training-setup screen: now passes playerName, schoolType, grade to training API
+
+**Question generation**:
+- Started LLM generation for EN, BIO, GE, EK, PW
+- EN completed: +40 new questions (en_basic_vocab, en_greetings_school, en_past_simple, en_comparatives, en_going_to, en_present_perfect, en_will_future)
+- Rate-limit hit again during BIO/GE/EK/PW
+- Current totals: 563 questions (403 seed + 160 LLM: MA=40, DE=80, EN=40)
+
+**Verified with Agent Browser**:
+- Onboarding: name → Gymnasium → Klasse 6
+- Training setup: selected Mathematik → started training
+- Questions filtered correctly: only grade-6-appropriate Math questions appeared
+- Difficulty progression: first question was easy (number series), second was slightly harder (cm to mm conversion)
+- Answer → reveal → next question all work
+- Lint: 0 errors, 0 warnings
+- Server: HTTP 200
+
+Stage Summary:
+- Filtering now works correctly: school type → track, grade → HARD INVARIANT, subject → optional filter
+- Training questions sorted easiest to hardest
+- 563 questions total (403 seed + 160 LLM across MA, DE, EN)
+- BIO, GE, EK, PW generation queued for when rate-limit resets

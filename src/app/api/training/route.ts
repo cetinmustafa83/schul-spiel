@@ -1,27 +1,34 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getCurrentPlayer } from "@/lib/session";
-import { catchRoute, errorResponse, json, trainingStartSchema, ApiError } from "@/lib/api";
-import { trackOfSchoolType, type PlayerContext } from "@/lib/game/selection";
+import { catchRoute, errorResponse, json, trainingStartSchema } from "@/lib/api";
+import { trackOfSchoolType, introGradeColumn, type Track } from "@/lib/game/selection";
 import { randomBytes } from "crypto";
 
 export const runtime = "nodejs";
 
+const startSchema = trainingStartSchema.extend({
+  playerName: z.string().min(1).max(40),
+  schoolType: z.string().min(2).max(4),
+  grade: z.number().int().min(5).max(8),
+});
+
+import { z } from "zod";
+
 export async function POST(req: Request): Promise<NextResponse> {
   return catchRoute(async () => {
-    const p = await getCurrentPlayer();
-    if (!p) return errorResponse("UNAUTHORIZED", 401);
     const body = await req.json().catch(() => ({}));
-    const parsed = trainingStartSchema.safeParse(body);
+    const parsed = startSchema.safeParse(body);
     if (!parsed.success) return errorResponse("VALIDATION", 400, parsed.error.issues[0]?.message ?? "Eingabe ungültig.");
-    const { subjectFilter, topicFilter, length } = parsed.data;
-    const player = await db.player.findUnique({ where: { id: p.id } });
-    if (!player) return errorResponse("NOT_FOUND", 404);
+    const { subjectFilter, topicFilter, length, playerName, schoolType, grade } = parsed.data;
 
-    const track = trackOfSchoolType(player.schoolType);
-    const column = track === "basic" ? "introGradeHs" : track === "advanced" ? "introGradeGy" : "introGradeRs";
+    const track = trackOfSchoolType(schoolType);
+    const column = introGradeColumn(track);
 
-    // Build the eligible pool.
+    // Build the eligible pool — filtered by:
+    // 1. School type (track) → intro_grade_T column
+    // 2. Grade → intro_grade_T ≤ player.grade (HARD INVARIANT)
+    // 3. Subject (optional) → subject.code in subjectFilter
+    // 4. Topic (optional) → topic.code in topicFilter
     const where: Record<string, unknown> = {
       status: "published",
       AND: [{ [column]: { not: null } }],
@@ -34,44 +41,60 @@ export async function POST(req: Request): Promise<NextResponse> {
     }
     const rows = await db.question.findMany({
       where: where as never,
-      select: { id: true, subjectId: true, [column]: true },
+      select: {
+        id: true,
+        subjectId: true,
+        [column]: true,
+        difficulty: true,
+      },
       take: 500,
     });
+
+    // Filter by grade (HARD INVARIANT) and collect with difficulty
     const eligible = rows
       .map((r) => ({
         id: r.id,
-        introGrade: (r as Record<string, unknown>)[column] as number | null,
         subjectId: r.subjectId,
+        introGrade: (r as Record<string, unknown>)[column] as number | null,
+        difficulty: (r as { difficulty: number }).difficulty,
       }))
-      .filter((r) => r.introGrade != null && r.introGrade <= player.grade);
+      .filter((r) => r.introGrade != null && r.introGrade <= grade);
 
     if (eligible.length === 0) {
       return errorResponse("VALIDATION", 503, "Keine passenden Fragen gefunden. Bitte wähle ein anderes Fach oder eine andere Klasse.");
     }
 
-    // Pick `length` random questions with subject diversity.
-    const shuffled = eligible.sort(() => Math.random() - 0.5);
+    // Sort by difficulty (easiest to hardest) + random within same difficulty
+    // This ensures the training session progresses from easy to hard
+    const shuffled = eligible.sort(() => Math.random() - 0.5); // randomize within same difficulty
+    shuffled.sort((a, b) => a.difficulty - b.difficulty); // stable sort by difficulty
     const picked = shuffled.slice(0, Math.min(length, shuffled.length));
+
     const sessionId = randomBytes(8).toString("hex");
-    const session = await db.trainingSession.create({
-      data: {
-        id: sessionId,
-        playerId: p.id,
-        subjectFilter: subjectFilter ? JSON.stringify(subjectFilter) : null,
-        topicFilter: topicFilter ? JSON.stringify(topicFilter) : null,
-        length: picked.length,
-        currentIndex: 0,
-        correctCount: 0,
+    const syntheticPlayerId = `browser-${playerName}`;
+
+    // Ensure Player exists for FK
+    await db.player.upsert({
+      where: { id: syntheticPlayerId },
+      update: { lastActiveAt: new Date() },
+      create: {
+        id: syntheticPlayerId,
+        displayName: playerName,
+        tag: "0000",
+        schoolType,
+        grade,
+        pinHash: "$scrypt$00000000000000000000000000000000$0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        rescueHash: "$scrypt$00000000000000000000000000000000$0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        xp: 0,
       },
     });
 
-    // Pre-persist GameQuestion rows for training too (so the answer endpoint is consistent).
     await db.game.create({
       data: {
         id: sessionId,
-        playerId: p.id,
+        playerId: syntheticPlayerId,
         mode: "TRAINING",
-        gradeAtStart: player.grade,
+        gradeAtStart: grade,
         track,
         currentLevel: 1,
         status: "in_progress",

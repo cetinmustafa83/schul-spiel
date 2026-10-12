@@ -1,20 +1,17 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getCurrentPlayer } from "@/lib/session";
 import { catchRoute, errorResponse, json, trainingAnswerSchema } from "@/lib/api";
 import { buildTrainingQuestion } from "@/app/api/training/route";
-import { addToReviewDeck } from "@/lib/game/leitner";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }): Promise<NextResponse> {
   return catchRoute(async () => {
     const { id } = await params;
-    const p = await getCurrentPlayer();
-    if (!p) return errorResponse("UNAUTHORIZED", 401);
-    const session = await db.trainingSession.findUnique({ where: { id } });
-    if (!session || session.playerId !== p.id) return errorResponse("NOT_FOUND", 404);
-    const game = await db.game.findUnique({ where: { id } });
+    const game = await db.game.findUnique({
+      where: { id },
+      include: { questions: { select: { level: true }, orderBy: { level: "desc" }, take: 1 } },
+    });
     if (!game) return errorResponse("NOT_FOUND", 404);
 
     const body = await req.json().catch(() => null);
@@ -23,7 +20,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const { sessionId, questionRef, optionIndex } = parsed.data;
     if (sessionId !== id) return errorResponse("INVALID_MOVE", 400, "Session-ID passt nicht.");
 
-    const currentLevel = session.currentIndex + 1;
+    const currentLevel = game.currentLevel;
+    const totalQuestions = game.questions[0]?.level ?? 0;
     const expectedRef = `${sessionId}.${currentLevel}`;
     if (questionRef !== expectedRef) return errorResponse("INVALID_MOVE", 400, "Diese Frage passt nicht zum aktuellen Stand.");
 
@@ -43,27 +41,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       data: { answeredIndex: optionIndex, correct, answeredAt: new Date() },
     });
 
-    // Update topic mastery + XP.
-    await db.topicMastery.upsert({
-      where: { playerId_topicId: { playerId: p.id, topicId: gq.question.topicId } },
-      update: { attempts: { increment: 1 }, correct: { increment: correct } },
-      create: { playerId: p.id, topicId: gq.question.topicId, attempts: 1, correct },
-    });
-    await db.player.update({
-      where: { id: p.id },
-      data: { xp: { increment: correct ? 5 : 1 } },
-    });
-    await db.trainingSession.update({
-      where: { id },
-      data: {
-        currentIndex: { increment: 1 },
-        correctCount: { increment: correct },
-      },
-    });
-
-    if (correct !== 1) {
-      await addToReviewDeck(p.id, gq.questionId);
-    }
+    // Topic mastery + XP + review deck tracked client-side via LokiJS.
+    // Skip server-side writes.
 
     const reveal = {
       correctIndex: gq.question.correctIndex,
@@ -74,17 +53,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       shuffledOptions: order.map((idx) => [gq.question.optA, gq.question.optB, gq.question.optC, gq.question.optD][idx]),
       canonicalOptions: [gq.question.optA, gq.question.optB, gq.question.optC, gq.question.optD],
       topic: { code: gq.question.topic.code, label: gq.question.topic.label },
+      questionId: gq.questionId,
+      topicId: gq.question.topicId,
     };
 
-    const nextIndex = currentLevel; // already incremented
-    const isLast = nextIndex >= session.length;
-    const next = isLast ? null : await buildTrainingQuestion(id, nextIndex + 1);
+    const nextIndex = currentLevel + 1;
+    const isLast = nextIndex > totalQuestions;
+    const next = isLast ? null : await buildTrainingQuestion(id, nextIndex);
 
-    if (isLast) {
-      await db.trainingSession.update({
+    if (!isLast) {
+      await db.game.update({
         where: { id },
-        data: { endedAt: new Date() },
+        data: { currentLevel: nextIndex },
       });
+    } else {
       await db.game.update({
         where: { id },
         data: { status: "finished", endedAt: new Date() },
@@ -97,8 +79,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       reveal,
       next,
       finished: isLast,
-      correctCount: session.correctCount + correct,
-      total: session.length,
+      correctCount: 0, // tracked client-side via LokiJS
+      total: totalQuestions,
     });
   });
 }

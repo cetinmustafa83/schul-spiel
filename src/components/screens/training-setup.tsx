@@ -23,7 +23,7 @@ interface Subject {
 const LENGTHS = [5, 10, 15, 20] as const;
 
 export function TrainingSetupScreen() {
-  const { navigate, setPayload, pushToast } = useApp();
+  const { navigate, setPayload, pushToast, player } = useApp();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,6 +93,9 @@ export function TrainingSetupScreen() {
           subjectFilter: Array.from(selectedSubjects),
           topicFilter: selectedTopics.size > 0 ? Array.from(selectedTopics) : undefined,
           length,
+          playerName: player?.name,
+          schoolType: player?.schoolType,
+          grade: player?.grade,
         }),
       });
       const data = await res.json();
