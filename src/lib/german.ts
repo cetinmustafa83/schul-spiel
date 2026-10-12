@@ -102,8 +102,6 @@ export const SUBJECT_LABELS: Record<string, string> = {
   EK: "Erdkunde",
   PW: "Politik/Wirtschaft",
   INF: "Informatik/Medien",
-  KU: "Kunst & Musik",
-  SP: "Sport & Gesundheit",
   AW: "Allgemeinwissen",
 };
 

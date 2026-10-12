@@ -296,38 +296,6 @@ export const TOPICS: TopicSeed[] = [
   { subjectCode: "INF", code: "inf_medienkritik", label: "Medienkritik und Fake News",
     introGradeHs: 7, introGradeRs: 6, introGradeGy: 6 },
 
-  // === Kunst & Musik ===
-  { subjectCode: "KU", code: "ku_farben", label: "Farben und Farbenlehre",
-    introGradeHs: 4, introGradeRs: 5, introGradeGy: 5 },
-  { subjectCode: "KU", code: "ku_farblehre", label: "Farblehre und Farbkontraste",
-    introGradeHs: 5, introGradeRs: 5, introGradeGy: 5 },
-  { subjectCode: "KU", code: "ku_noten", label: "Notenwerte und Rhythmus",
-    introGradeHs: 5, introGradeRs: 5, introGradeGy: 5 },
-  { subjectCode: "KU", code: "ku_instrumente", label: "Instrumentenfamilien",
-    introGradeHs: 5, introGradeRs: 5, introGradeGy: 5 },
-  { subjectCode: "KU", code: "ku_perspektive", label: "Perspektive und Takt",
-    introGradeHs: 7, introGradeRs: 6, introGradeGy: 6 },
-  { subjectCode: "KU", code: "ku_tonleiter", label: "Tonleitern und Tonarten",
-    introGradeHs: 6, introGradeRs: 6, introGradeGy: 6 },
-  { subjectCode: "KU", code: "ku_intervalle", label: "Intervalle",
-    introGradeHs: 6, introGradeRs: 6, introGradeGy: 6 },
-  { subjectCode: "KU", code: "ku_noten_bass", label: "Notenschlüssel (Violin- und Bassschlüssel)",
-    introGradeHs: 5, introGradeRs: 5, introGradeGy: 5 },
-  { subjectCode: "KU", code: "ku_zauberfloete", label: "Zauberflöte und Mozart",
-    introGradeHs: 6, introGradeRs: 6, introGradeGy: 6 },
-  { subjectCode: "KU", code: "ku_programmmusik", label: "Programm- undabsolute Musik",
-    introGradeHs: 7, introGradeRs: 7, introGradeGy: 7 },
-
-  // === Sport & Gesundheit ===
-  { subjectCode: "SP", code: "sp_spielregeln", label: "Spielregeln",
-    introGradeHs: 4, introGradeRs: 5, introGradeGy: 5 },
-  { subjectCode: "SP", code: "sp_fitness", label: "Fitness und Ernährung",
-    introGradeHs: 6, introGradeRs: 5, introGradeGy: 5 },
-  { subjectCode: "SP", code: "sp_hygiene", label: "Hygiene und Teamsport",
-    introGradeHs: 7, introGradeRs: 6, introGradeGy: 6 },
-  { subjectCode: "SP", code: "sp_herz_kreislauf", label: "Herz-Kreislauf und Erste Hilfe",
-    introGradeHs: 8, introGradeRs: 7, introGradeGy: 7 },
-
   // === Allgemeinwissen / Natur & Technik ===
   { subjectCode: "AW", code: "aw_alltag", label: "Alltag und Natur",
     introGradeHs: 4, introGradeRs: 4, introGradeGy: 4 },
@@ -359,9 +327,7 @@ export const SUBJECTS = [
   { code: "EK", label: "Erdkunde", icon: "🗺️", color: "#5CC8FF", sort: 8 },
   { code: "PW", label: "Politik & Wirtschaft", icon: "🗳️", color: "#8B6CFF", sort: 9 },
   { code: "INF", label: "Informatik & Medien", icon: "💻", color: "#31B7E6", sort: 10 },
-  { code: "KU", label: "Kunst & Musik", icon: "🎨", color: "#E86CB5", sort: 11 },
-  { code: "SP", label: "Sport & Gesundheit", icon: "⚽", color: "#3DDBA4", sort: 12 },
-  { code: "AW", label: "Allgemeinwissen", icon: "🌍", color: "#F2A93B", sort: 13 },
+  { code: "AW", label: "Allgemeinwissen", icon: "🌍", color: "#F2A93B", sort: 11 },
 ];
 
 export const SCHOOL_TYPES = [
