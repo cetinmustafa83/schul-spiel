@@ -13,7 +13,9 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Download, Trash2, Volume2, Eye, LogOut } from "lucide-react";
+import { ArrowLeft, Download, Trash2, Volume2, Eye, LogOut, Key, Sparkles } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { SCHOOL_TYPE_LABELS } from "@/lib/german";
 import { updatePlayer, deletePlayer, exportPlayerData } from "@/lib/browser-db";
 import { useScreenTransition } from "@/lib/animations/gsap-hooks";
@@ -32,6 +34,23 @@ export function SettingsScreen() {
   const ref = useScreenTransition<HTMLDivElement>();
   const [schoolType, setSchoolType] = useState(player?.schoolType ?? "GY");
   const [grade, setGrade] = useState(player?.grade ?? 5);
+  const [glmApiKey, setGlmApiKey] = useState("");
+  const [glmModel, setGlmModel] = useState("glm-4.7");
+  const [showApiKey, setShowApiKey] = useState(false);
+
+  // Load GLM API key from localStorage
+  useEffect(() => {
+    const key = localStorage.getItem("glm-api-key");
+    const model = localStorage.getItem("glm-model");
+    if (key) setGlmApiKey(key);
+    if (model) setGlmModel(model);
+  }, []);
+
+  function saveGlmKey() {
+    localStorage.setItem("glm-api-key", glmApiKey);
+    localStorage.setItem("glm-model", glmModel);
+    pushToast("GLM API-Key gespeichert.", "success");
+  }
   const [deleting, setDeleting] = useState(false);
 
   async function updateSchoolType(v: string) {
@@ -218,6 +237,61 @@ export function SettingsScreen() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+          </div>
+        </Section>
+
+        {/* GLM AI section */}
+        <Section title="KI-Analyse (GLM)">
+          <div className="flex flex-col gap-3">
+            <p className="text-sm leading-relaxed text-ink-dim">
+              Optional: Verbinde ein GLM-Modell für KI-gestützte Auswertungen,
+              automatisierte Empfehlungen und personalisierte Lernpfade.
+              Der API-Key bleibt lokal in deinem Browser — er wird nicht an einen Server gesendet.
+            </p>
+            <div className="flex flex-col gap-1.5">
+              <Label>GLM API-Key</Label>
+              <div className="flex gap-2">
+                <Input
+                  type={showApiKey ? "text" : "password"}
+                  value={glmApiKey}
+                  onChange={(e) => setGlmApiKey(e.target.value)}
+                  placeholder="API-Key eingeben"
+                  className="font-mono text-sm"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-10 px-3"
+                  onClick={() => setShowApiKey((s) => !s)}
+                >
+                  {showApiKey ? "Verbergen" : "Zeigen"}
+                </Button>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label>Modell</Label>
+              <Select value={glmModel} onValueChange={setGlmModel}>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="glm-4.7">GLM-4.7 (Empfohlen)</SelectItem>
+                  <SelectItem value="glm-4.6">GLM-4.6</SelectItem>
+                  <SelectItem value="glm-4-flash">GLM-4-Flash (Kostenlos)</SelectItem>
+                  <SelectItem value="glm-4v">GLM-4V (Vision)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2 rounded-lg border border-border bg-bg2/20 p-3">
+              <Sparkles className="h-4 w-4 shrink-0 text-ink-dim" />
+              <p className="text-xs leading-relaxed text-ink-dim">
+                Mit GLM erhältst du detaillierte Klassenarbeits-Auswertungen mit
+                psychologischer Einschätzung, Lernpfad-Empfehlungen und
+                automatisierten Themenvorschlägen. Bilder über Perchance werden
+                für visuelle Illustrationen im Bericht generiert.
+              </p>
+            </div>
+            <Button onClick={saveGlmKey} className="w-full">
+              <Key className="mr-2 h-4 w-4" /> API-Key speichern
+            </Button>
           </div>
         </Section>
 
