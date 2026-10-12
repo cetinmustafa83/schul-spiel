@@ -6,13 +6,12 @@ import { LadderRail, type LadderStep } from "@/components/ui/ladder-rail";
 import { GooeyButton } from "@/components/ui/gooey";
 import { SCHOOL_TYPE_LABELS, formatTaler } from "@/lib/german";
 import { useScreenTransition } from "@/lib/animations/gsap-hooks";
-import { ArrowLeft, Timer, Shuffle, BarChart3, PhoneCall, Split, Info, Trophy, ChevronRight } from "lucide-react";
+import { ArrowLeft, Timer, Shuffle, BarChart3, Split, Info, Trophy, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const JOKER_INFO = [
   { code: "FIFTY_FIFTY", label: "50:50", icon: Split, desc: "Entfernt zwei falsche Antworten." },
   { code: "AUDIENCE", label: "Klassen-Umfrage", icon: BarChart3, desc: "Was denken die anderen Spieler:innen?" },
-  { code: "PHONE", label: "Lumi fragen", icon: PhoneCall, desc: "Lumi gibt dir einen Tipp — sie kann sich auch irren." },
   { code: "SWITCH", label: "Frage tauschen", icon: Shuffle, desc: "Tauscht die Frage gegen eine neue." },
 ];
 

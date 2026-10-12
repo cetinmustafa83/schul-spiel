@@ -7,13 +7,13 @@ import { AnswerPlate, QuestionCard } from "@/components/ui/answer-plate";
 import { LadderRail, type LadderStep } from "@/components/ui/ladder-rail";
 import { Lumi } from "@/components/lumi";
 import {
-  ArrowLeft, ArrowRight, Split, BarChart3, PhoneCall, Shuffle,
+  ArrowLeft, ArrowRight, Split, BarChart3, Shuffle,
   DoorOpen, X, CheckCircle2, XCircle, Trophy, Timer,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatTaler, SCHOOL_TYPE_LABELS } from "@/lib/german";
 import { useQuestionReveal, playCorrectReveal, playWrongReveal } from "@/lib/animations/gsap-hooks";
-import { sfxLockIn, sfxCorrect, sfxWrong, sfxFiftyFifty, sfxAudience, sfxPhone, sfxSwitch, sfxSafeStation, sfxSummit, sfxTickTack, sfxTimeUp } from "@/lib/audio/sfx";
+import { sfxLockIn, sfxCorrect, sfxWrong, sfxFiftyFifty, sfxAudience, sfxSwitch, sfxSafeStation, sfxSummit, sfxTickTack, sfxTimeUp } from "@/lib/audio/sfx";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet";
@@ -34,7 +34,6 @@ interface QuestionPayload {
 interface JokerState {
   FIFTY_FIFTY: boolean;
   AUDIENCE: boolean;
-  PHONE: boolean;
   SWITCH: boolean;
 }
 
@@ -58,7 +57,7 @@ export function GameStageScreen() {
   const { payload, navigate, pushToast, prefs, player } = useApp();
   const gameId = payload?.gameId as string;
   const initialLadder = (payload?.ladder as LadderStep[]) ?? [];
-  const initialJokers = (payload?.jokers as JokerState) ?? { FIFTY_FIFTY: true, AUDIENCE: true, PHONE: true, SWITCH: true };
+  const initialJokers = (payload?.jokers as JokerState) ?? { FIFTY_FIFTY: true, AUDIENCE: true, SWITCH: true };
 
   const [ladder, setLadder] = useState<LadderStep[]>(initialLadder);
   const [level, setLevel] = useState(1);
@@ -73,9 +72,8 @@ export function GameStageScreen() {
   const [gameFinished, setGameFinished] = useState(false);
   const [finalSheet, setFinalSheet] = useState(false);
   const [walkAwayDialog, setWalkAwayDialog] = useState(false);
-  const [jokerModal, setJokerModal] = useState<"audience" | "phone" | null>(null);
+  const [jokerModal, setJokerModal] = useState<"audience" | null>(null);
   const [audiencePoll, setAudiencePoll] = useState<number[] | null>(null);
-  const [phoneSuggests, setPhoneSuggests] = useState<{ suggests: number; confidence: string; phrase: string } | null>(null);
 
   // Timer state — per-question timer + 40-minute total challenge
   const timerMode = (payload?.timerMode as string) ?? "off";
@@ -99,7 +97,7 @@ export function GameStageScreen() {
     const res = await fetch(`/api/games/${gameId}`, { cache: "no-store" });
     const data = await res.json();
     setLadder(data.ladder ?? []);
-    setJokers(data.jokers ?? { FIFTY_FIFTY: true, AUDIENCE: true, PHONE: true, SWITCH: true });
+    setJokers(data.jokers ?? { FIFTY_FIFTY: true, AUDIENCE: true, SWITCH: true });
     setLevel(data.level ?? 1);
     setWinnings(data.winnings ?? 0);
     if (data.status === "finished" || !data.question) {
@@ -256,7 +254,6 @@ export function GameStageScreen() {
     setEliminated([]);
     setReveal(null);
     setAudiencePoll(null);
-    setPhoneSuggests(null);
     setPhase("asking");
   }
 
@@ -282,10 +279,6 @@ export function GameStageScreen() {
         sfxAudience();
         setAudiencePoll(data.poll as number[]);
         setJokerModal("audience");
-      } else if (type === "PHONE") {
-        sfxPhone();
-        setPhoneSuggests(data);
-        setJokerModal("phone");
       } else if (type === "SWITCH") {
         sfxSwitch();
         setQuestion(data.newQuestion);
@@ -473,11 +466,10 @@ export function GameStageScreen() {
           )}
 
           {/* Jokers bar */}
-          <div className="grid grid-cols-4 gap-2 rounded-2xl border border-border bg-bg1/60 p-3">
+          <div className="grid grid-cols-3 gap-2 rounded-2xl border border-border bg-bg1/60 p-3">
             {([
               { key: "FIFTY_FIFTY", label: "50:50", icon: <Split className="h-5 w-5" /> },
               { key: "AUDIENCE", label: "Umfrage", icon: <BarChart3 className="h-5 w-5" /> },
-              { key: "PHONE", label: "Lumi", icon: <PhoneCall className="h-5 w-5" /> },
               { key: "SWITCH", label: "Tauschen", icon: <Shuffle className="h-5 w-5" /> },
             ] as const).map((j) => {
               const available = jokers[j.key];
@@ -502,18 +494,6 @@ export function GameStageScreen() {
                 </button>
               );
             })}
-          </div>
-
-          {/* Encouragement */}
-          <div className="flex items-center gap-3 rounded-2xl border border-border bg-bg1/40 p-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-bg2/40 text-ink-dim">
-              <Lumi pose={phase === "revealing" ? "thinking" : "idle"} size={40} />
-            </div>
-            <p className="text-sm text-ink-dim">
-              {phase === "asking" && "Lies die Frage in Ruhe. Du schaffst das."}
-              {phase === "revealing" && reveal?.correct && "Richtig. Weiter zur nächsten Stufe."}
-              {phase === "revealing" && !reveal?.correct && "Knapp daneben. Schau dir die Erklärung an."}
-            </p>
           </div>
         </div>
 
@@ -619,37 +599,6 @@ export function GameStageScreen() {
           )}
           <DialogFooter>
             <Button className="w-full" onClick={() => setJokerModal(null)}>Verstanden</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Phone joker modal */}
-      <Dialog open={jokerModal === "phone"} onOpenChange={(o) => !o && setJokerModal(null)}>
-        <DialogContent className="bg-bg1 border-border backdrop-blur-xl">
-          <DialogHeader>
-            <DialogTitle className="font-display text-xl tracking-tight text-ink">Lumi fragen</DialogTitle>
-            <DialogDescription className="text-ink-dim">
-              Lumi überlegt sich eine Antwort — sie kann sich auch irren!
-            </DialogDescription>
-          </DialogHeader>
-          {phoneSuggests && question && (
-            <div className="mt-2 flex items-start gap-3 rounded-xl border border-border bg-bg2/30 p-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-border bg-bg2/40">
-                <Lumi pose="thinking" size={48} />
-              </div>
-              <div>
-                <p className="text-sm text-ink leading-relaxed">{phoneSuggests.phrase}</p>
-                <p className="mt-2 text-xs text-ink-dim">
-                  Lumi tippt auf:{" "}
-                  <span className="inline-block rounded border border-border bg-bg2/40 px-2 py-0.5 font-display font-semibold text-ink">
-                    {LETTERS[phoneSuggests.suggests]} — {question.options[phoneSuggests.suggests]}
-                  </span>
-                </p>
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button className="w-full" onClick={() => setJokerModal(null)}>Danke, Lumi!</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

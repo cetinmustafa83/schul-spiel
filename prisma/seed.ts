@@ -199,7 +199,7 @@ async function seedJokers() {
   const jokers = [
     { code: "FIFTY_FIFTY", label: "50:50", enabled: 1, configJson: JSON.stringify({ usesPerGame: 1 }) },
     { code: "AUDIENCE", label: "Klassen-Umfrage", enabled: 1, configJson: JSON.stringify({ usesPerGame: 1, minRealAnswers: 30 }) },
-    { code: "PHONE", label: "Lumi fragen", enabled: 1, configJson: JSON.stringify({ usesPerGame: 1, correctAtLevel1: 0.95, correctAtLevel15: 0.60 }) },
+    { code: "PHONE", label: "Lumi fragen", enabled: 0, configJson: JSON.stringify({ usesPerGame: 1, correctAtLevel1: 0.95, correctAtLevel15: 0.60 }) },
     { code: "SWITCH", label: "Frage tauschen", enabled: 1, configJson: JSON.stringify({ usesPerGame: 1 }) },
   ];
   for (const j of jokers) {

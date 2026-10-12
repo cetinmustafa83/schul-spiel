@@ -15,17 +15,16 @@ import { trackOfSchoolType } from "@/lib/game/selection";
  *     one of the same level/tier (counts as used).
  */
 
-export type JokerType = "FIFTY_FIFTY" | "AUDIENCE" | "PHONE" | "SWITCH";
+export type JokerType = "FIFTY_FIFTY" | "AUDIENCE" | "SWITCH";
 
 export interface JokerState {
   FIFTY_FIFTY: boolean;
   AUDIENCE: boolean;
-  PHONE: boolean;
   SWITCH: boolean;
 }
 
 export function freshJokerState(): JokerState {
-  return { FIFTY_FIFTY: true, AUDIENCE: true, PHONE: true, SWITCH: true };
+  return { FIFTY_FIFTY: true, AUDIENCE: true, SWITCH: true };
 }
 
 export function parseJokerState(json: string | null): JokerState {
@@ -35,7 +34,6 @@ export function parseJokerState(json: string | null): JokerState {
     return {
       FIFTY_FIFTY: !!obj.FIFTY_FIFTY,
       AUDIENCE: !!obj.AUDIENCE,
-      PHONE: !!obj.PHONE,
       SWITCH: !!obj.SWITCH,
     };
   } catch {
