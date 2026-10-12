@@ -3,6 +3,7 @@
 import { useRef, useEffect, useCallback } from "react";
 import { gsap } from "gsap";
 import { cn } from "@/lib/utils";
+import { sfxSelect } from "@/lib/audio/sfx";
 import type { ReactNode } from "react";
 
 interface AnswerPlateProps {
@@ -76,7 +77,7 @@ export function AnswerPlate({
 
   const handleClick = useCallback(() => {
     if (disabled || state !== "idle") return;
-    // Press-down bounce
+    sfxSelect();
     gsap.timeline()
       .to(innerRef.current, { scale: 0.94, duration: 0.08, ease: "power2.in" })
       .to(innerRef.current, { scale: 1, duration: 0.4, ease: "elastic.out(1, 0.4)" });

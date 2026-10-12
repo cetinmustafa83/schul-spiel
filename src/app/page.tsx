@@ -2,6 +2,7 @@
 
 import { useEffect, useState, lazy, Suspense } from "react";
 import { useApp, type Screen } from "@/lib/store";
+import { setSoundEnabled, unlockAudio } from "@/lib/audio/sfx";
 import { LandingScreen } from "@/components/screens/landing";
 import { OnboardingScreen } from "@/components/screens/onboarding";
 import { HomeScreen } from "@/components/screens/home";
@@ -45,6 +46,21 @@ export default function Page() {
 
   // Prevent SSR rendering of browser-only components
   useEffect(() => { setMounted(true); }, []);
+
+  // Sync sound preference to the audio engine + unlock audio on first gesture
+  useEffect(() => {
+    setSoundEnabled(prefs.sound);
+  }, [prefs.sound]);
+
+  useEffect(() => {
+    const handler = () => { unlockAudio(); };
+    window.addEventListener("pointerdown", handler, { once: true });
+    window.addEventListener("keydown", handler, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", handler);
+      window.removeEventListener("keydown", handler);
+    };
+  }, []);
 
   // Bootstrap — load player from LokiJS (browser localStorage)
   useEffect(() => {

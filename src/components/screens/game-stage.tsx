@@ -13,6 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatTaler, SCHOOL_TYPE_LABELS } from "@/lib/german";
 import { useQuestionReveal, playCorrectReveal, playWrongReveal } from "@/lib/animations/gsap-hooks";
+import { sfxLockIn, sfxCorrect, sfxWrong, sfxFiftyFifty, sfxAudience, sfxPhone, sfxSwitch, sfxSafeStation, sfxSummit } from "@/lib/audio/sfx";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet";
@@ -115,6 +116,7 @@ export function GameStageScreen() {
 
   async function confirmAnswer() {
     if (selected == null || !question) return;
+    sfxLockIn();
     setFinalSheet(false);
     setPhase("revealing");
     try {
@@ -131,10 +133,22 @@ export function GameStageScreen() {
       }
       // Set reveal FIRST, then update other state
       setReveal(data.reveal);
+      // Play sound effect based on result
+      if (data.reveal?.correct === true) {
+        sfxCorrect();
+      } else {
+        sfxWrong();
+      }
       if (data.game?.status === "finished") {
         setWinnings(data.game.winnings ?? 0);
         setEndedReason(data.game.reason === "summit_reached" ? "summit_reached" : "wrong_answer");
         setGameFinished(true);
+        // Play summit sound if reached, safe station if fell to safe level
+        if (data.game.reason === "summit_reached") {
+          sfxSummit();
+        } else if (data.game.winnings > 0) {
+          sfxSafeStation();
+        }
       } else {
         setGameFinished(false);
       }
@@ -203,15 +217,19 @@ export function GameStageScreen() {
       }
       setJokers(data.jokers);
       if (type === "FIFTY_FIFTY") {
+        sfxFiftyFifty();
         setEliminated(data.eliminated as number[]);
         pushToast("50:50 — zwei falsche Antworten entfernt.", "info");
       } else if (type === "AUDIENCE") {
+        sfxAudience();
         setAudiencePoll(data.poll as number[]);
         setJokerModal("audience");
       } else if (type === "PHONE") {
+        sfxPhone();
         setPhoneSuggests(data);
         setJokerModal("phone");
       } else if (type === "SWITCH") {
+        sfxSwitch();
         setQuestion(data.newQuestion);
         setSelected(null);
         setEliminated([]);
