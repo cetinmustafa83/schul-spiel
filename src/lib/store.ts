@@ -43,7 +43,6 @@ interface AppState {
   // Player prefs — stored in localStorage
   prefs: {
     sound: boolean;
-    music: boolean;
     reducedMotion: boolean;
     textScale: number;
     dyslexia: boolean;
@@ -61,15 +60,15 @@ const PREFS_KEY = "wissensgipfel-prefs";
 
 function loadPrefs(): AppState["prefs"] {
   if (typeof window === "undefined") {
-    return { sound: true, music: false, reducedMotion: false, textScale: 100, dyslexia: false, timer: "off" };
+    return { sound: true, reducedMotion: false, textScale: 100, dyslexia: false, timer: "off" };
   }
   try {
     const stored = localStorage.getItem(PREFS_KEY);
-    if (stored) return { ...{ sound: true, music: false, reducedMotion: false, textScale: 100, dyslexia: false, timer: "off" }, ...JSON.parse(stored) };
+    if (stored) return { ...{ sound: true, reducedMotion: false, textScale: 100, dyslexia: false, timer: "off" }, ...JSON.parse(stored) };
   } catch {
     // ignore
   }
-  return { sound: true, music: false, reducedMotion: false, textScale: 100, dyslexia: false, timer: "off" };
+  return { sound: true, reducedMotion: false, textScale: 100, dyslexia: false, timer: "off" };
 }
 
 export const useApp = create<AppState>((set, get) => ({
