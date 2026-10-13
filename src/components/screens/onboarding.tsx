@@ -61,7 +61,7 @@ export function OnboardingScreen() {
         xp: player.xp,
       });
       pushToast(`Willkommen, ${player.name}!`, "success");
-      navigate("home");
+      navigate("klassenarbeit-setup");
     } catch {
       setError("Etwas ist schiefgelaufen. Bitte versuche es nochmal.");
       setSubmitting(false);
