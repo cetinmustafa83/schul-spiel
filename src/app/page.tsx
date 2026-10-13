@@ -11,6 +11,7 @@ import { KlassenarbeitSetupScreen } from "@/components/screens/klassenarbeit-set
 import { KlassenarbeitRunScreen } from "@/components/screens/klassenarbeit-run";
 import { ProfileScreen } from "@/components/screens/profile";
 import { SettingsScreen } from "@/components/screens/settings";
+import { BinaryOrbits } from "@/components/ui/binary-orbits";
 import { getDB, getPlayer } from "@/lib/browser-db";
 
 const SCREENS: Record<Screen, React.ComponentType> = {
@@ -79,7 +80,8 @@ export default function Page() {
   if (loadingPlayer || !mounted) {
     return (
       <main className="relative flex min-h-screen items-center justify-center bg-bg0">
-        <div className="flex flex-col items-center gap-4 text-center">
+        <BinaryOrbits reducedMotion={prefs.reducedMotion} />
+        <div className="relative z-10 flex flex-col items-center gap-4 text-center">
           <div className="animate-pulse text-6xl">🏔️</div>
           <p className="font-display text-xl text-ink">Wird geladen …</p>
         </div>
@@ -93,6 +95,7 @@ export default function Page() {
   const Screen = SCREENS[screen] ?? LandingScreen;
   return (
     <main className="relative min-h-screen">
+      <BinaryOrbits reducedMotion={prefs.reducedMotion} />
       <div className="relative z-10">
         <Screen />
       </div>
