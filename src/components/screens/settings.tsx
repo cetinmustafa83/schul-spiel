@@ -1,24 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import {
+  Container, Box, Typography, Button, Card, CardContent,
+  Switch, Select, MenuItem, Slider, TextField, IconButton, Divider,
+  FormControl, InputLabel, Dialog, DialogTitle, DialogContent, DialogActions,
+  Collapse, Avatar,
+} from "@mui/material";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import VolumeUpIcon from "@mui/icons-material/VolumeUp";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import TextFieldsIcon from "@mui/icons-material/TextFields";
+import DownloadIcon from "@mui/icons-material/Download";
+import DeleteIcon from "@mui/icons-material/Delete";
+import LogoutIcon from "@mui/icons-material/Logout";
+import VpnKeyIcon from "@mui/icons-material/VpnKey";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { useApp } from "@/lib/store";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Slider } from "@/components/ui/slider";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { ArrowLeft, Download, Trash2, Volume2, Eye, LogOut, Key, Sparkles } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { SCHOOL_TYPE_LABELS } from "@/lib/german";
 import { updatePlayer, deletePlayer, exportPlayerData } from "@/lib/browser-db";
-import { useScreenTransition } from "@/lib/animations/gsap-hooks";
+import { motionPresets } from "@/lib/theme";
 
 const SCHOOL_TYPES = [
   { code: "HS", label: "Hauptschule" },
@@ -31,14 +34,14 @@ const GRADES = [5, 6, 7, 8];
 
 export function SettingsScreen() {
   const { navigate, player, setPlayer, prefs, setPrefs, pushToast } = useApp();
-  const ref = useScreenTransition<HTMLDivElement>();
   const [schoolType, setSchoolType] = useState(player?.schoolType ?? "GY");
   const [grade, setGrade] = useState(player?.grade ?? 5);
   const [glmApiKey, setGlmApiKey] = useState("");
   const [glmModel, setGlmModel] = useState("glm-4.7");
   const [showApiKey, setShowApiKey] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
-  // Load GLM API key from localStorage
   useEffect(() => {
     const key = localStorage.getItem("glm-api-key");
     const model = localStorage.getItem("glm-model");
@@ -51,7 +54,6 @@ export function SettingsScreen() {
     localStorage.setItem("glm-model", glmModel);
     pushToast("GLM API-Key gespeichert.", "success");
   }
-  const [deleting, setDeleting] = useState(false);
 
   async function updateSchoolType(v: string) {
     setSchoolType(v);
@@ -95,9 +97,7 @@ export function SettingsScreen() {
     setDeleting(true);
     try {
       await deletePlayer(player.name);
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("wissensgipfel-last-player");
-      }
+      if (typeof window !== "undefined") localStorage.removeItem("wissensgipfel-last-player");
       setPlayer(null);
       pushToast("Dein Konto wurde gelöscht.", "success");
       navigate("landing");
@@ -105,261 +105,197 @@ export function SettingsScreen() {
       pushToast("Löschung fehlgeschlagen.", "error");
     } finally {
       setDeleting(false);
+      setDeleteDialogOpen(false);
     }
   }
 
   function switchPlayer() {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("wissensgipfel-last-player");
-    }
+    if (typeof window !== "undefined") localStorage.removeItem("wissensgipfel-last-player");
     setPlayer(null);
     navigate("landing");
   }
 
   return (
-    <div ref={ref} className="mx-auto flex min-h-screen max-w-2xl flex-col px-4 py-6 sm:px-6">
-      <header className="mb-6 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() => navigate("home")}
-          className="tap-target inline-flex items-center gap-1.5 rounded-full border border-border bg-bg1/40 px-3 py-1.5 text-sm text-ink-dim backdrop-blur hover:text-ink"
-        >
-          <ArrowLeft className="h-4 w-4" /> Zurück
-        </button>
-        <span className="font-display text-sm font-semibold uppercase tracking-wider text-ink-dim">
-          Einstellungen
-        </span>
-      </header>
+    <Container maxWidth="sm" sx={{ minHeight: "100vh", py: 4 }}>
+      {/* Header */}
+      <Box component={motion.div} {...motionPresets.itemEnter(0)} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 4 }}>
+        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate("home")} sx={{ color: "text.secondary" }}>
+          Zurück
+        </Button>
+        <Typography variant="overline" fontWeight={600} color="text.secondary">Einstellungen</Typography>
+      </Box>
 
-      <main className="flex flex-col gap-6">
-        {/* Account section */}
-        <Section title="Konto">
-          <Row label="Name">
-            <div className="rounded-lg border border-border bg-bg2/30 px-3 py-2 font-display text-sm text-ink">
-              {player?.name}
-            </div>
-          </Row>
-          <Row label="Schulform">
-            <Select value={schoolType} onValueChange={(v) => void updateSchoolType(v)}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {SCHOOL_TYPES.map((st) => (
-                  <SelectItem key={st.code} value={st.code}>{st.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Row>
-          <Row label="Klasse">
-            <Select value={String(grade)} onValueChange={(v) => void updateGrade(Number(v))}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {GRADES.map((g) => (
-                  <SelectItem key={g} value={String(g)}>Klasse {g}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Row>
-        </Section>
+      {/* Account section */}
+      <Box component={motion.div} {...motionPresets.cardEnter(0.1)} sx={{ mb: 3 }}>
+        <Card sx={{ p: 3, bgcolor: "background.paper" }}>
+          <Typography variant="overline" color="text.secondary" fontWeight={600} sx={{ display: "block", mb: 2 }}>Konto</Typography>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+            <Box>
+              <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ mb: 0.5 }}>Name</Typography>
+              <Box sx={{ px: 2, py: 1.5, borderRadius: 1.5, border: "1px solid", borderColor: "divider", bgcolor: "rgba(245, 243, 255, 0.03)" }}>
+                <Typography variant="body2">{player?.name}</Typography>
+              </Box>
+            </Box>
+            <FormControl fullWidth size="small">
+              <InputLabel>Schulform</InputLabel>
+              <Select value={schoolType} label="Schulform" onChange={(e) => void updateSchoolType(e.target.value)}>
+                {SCHOOL_TYPES.map((st) => <MenuItem key={st.code} value={st.code}>{st.label}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth size="small">
+              <InputLabel>Klasse</InputLabel>
+              <Select value={String(grade)} label="Klasse" onChange={(e) => void updateGrade(Number(e.target.value))}>
+                {GRADES.map((g) => <MenuItem key={g} value={String(g)}>Klasse {g}</MenuItem>)}
+              </Select>
+            </FormControl>
+          </Box>
+        </Card>
+      </Box>
 
-        {/* Sound & Display section */}
-        <Section title="Anzeige & Sound">
-          <ToggleRow
-            icon={<Volume2 className="h-4 w-4 text-ink-dim" />}
-            label="Sound-Effekte"
-            description="Kurze Töne bei Antworten, Jokern und Aktionen."
-            checked={prefs.sound}
-            onCheckedChange={(v) => setPrefs({ sound: v })}
-          />
-          <ToggleRow
-            icon={<Eye className="h-4 w-4 text-ink-dim" />}
-            label="Reduzierte Bewegung"
-            description="Weniger Animationen, keine Bildschirm-Erschütterung."
-            checked={prefs.reducedMotion}
-            onCheckedChange={(v) => setPrefs({ reducedMotion: v })}
-          />
-          <ToggleRow
-            label="Legasthenie-Modus"
-            description="Deutlichere Schriften und mehr Zeilenabstand."
-            checked={prefs.dyslexia}
-            onCheckedChange={(v) => setPrefs({ dyslexia: v })}
-          />
-          <Row label={`Textgröße: ${prefs.textScale}%`}>
-            <Slider
-              value={[prefs.textScale]}
-              min={100}
-              max={150}
-              step={25}
-              onValueChange={(arr) => {
-                const v = arr[0];
-                if (typeof v === "number") setPrefs({ textScale: v });
-              }}
-            />
-            <div className="flex justify-between text-xs text-ink-dim">
-              <span>100%</span><span>125%</span><span>150%</span>
-            </div>
-          </Row>
-        </Section>
+      {/* Sound & Display section */}
+      <Box component={motion.div} {...motionPresets.cardEnter(0.15)} sx={{ mb: 3 }}>
+        <Card sx={{ p: 3, bgcolor: "background.paper" }}>
+          <Typography variant="overline" color="text.secondary" fontWeight={600} sx={{ display: "block", mb: 2 }}>Anzeige & Sound</Typography>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            <ToggleRow icon={<VolumeUpIcon />} label="Sound-Effekte" description="Kurze Töne bei Antworten und Aktionen." checked={prefs.sound} onChange={(v) => setPrefs({ sound: v })} />
+            <Divider />
+            <ToggleRow icon={<VisibilityIcon />} label="Reduzierte Bewegung" description="Weniger Animationen." checked={prefs.reducedMotion} onChange={(v) => setPrefs({ reducedMotion: v })} />
+            <Divider />
+            <ToggleRow icon={<TextFieldsIcon />} label="Legasthenie-Modus" description="Deutlichere Schriften und mehr Zeilenabstand." checked={prefs.dyslexia} onChange={(v) => setPrefs({ dyslexia: v })} />
+            <Divider />
+            <Box sx={{ py: 1.5 }}>
+              <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ mb: 1 }}>Textgröße: {prefs.textScale}%</Typography>
+              <Slider
+                value={prefs.textScale}
+                min={100} max={150} step={25}
+                onChange={(_, v) => setPrefs({ textScale: v as number })}
+                marks={[
+                  { value: 100, label: "100%" },
+                  { value: 125, label: "125%" },
+                  { value: 150, label: "150%" },
+                ]}
+                sx={{ color: "primary.main" }}
+              />
+            </Box>
+          </Box>
+        </Card>
+      </Box>
 
-        {/* Data & Privacy section */}
-        <Section title="Daten & Datenschutz">
-          <div className="flex flex-col gap-3">
-            <p className="text-sm leading-relaxed text-ink-dim">
-              Alle deine Daten werden lokal in deinem Browser gespeichert. Nichts wird an einen Server gesendet.
-              Du kannst deine Daten jederzeit herunterladen oder vollständig löschen.
-            </p>
-            <Button variant="outline" className="w-full justify-start" onClick={() => void downloadData()}>
-              <Download className="mr-2 h-4 w-4" /> Meine Daten herunterladen (JSON)
-            </Button>
-
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" className="w-full justify-start">
-                  <Trash2 className="mr-2 h-4 w-4" /> Konto löschen
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent className="bg-bg1 border-border backdrop-blur-xl">
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Wirklich löschen?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Diese Aktion kann nicht rückgängig gemacht werden. Alle deine
-                    Spielstände, Statistiken und der Wiederholungsstapel werden gelöscht.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-                  <AlertDialogAction
-                    className="bg-coral text-white hover:bg-coral/90"
-                    onClick={() => void deleteAccount()}
-                    disabled={deleting}
-                  >
-                    {deleting ? "Lösche …" : "Endgültig löschen"}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-        </Section>
-
-        {/* GLM AI section */}
-        <Section title="KI-Analyse (GLM)">
-          <div className="flex flex-col gap-3">
-            <p className="text-sm leading-relaxed text-ink-dim">
-              Optional: Verbinde ein GLM-Modell für KI-gestützte Auswertungen,
-              automatisierte Empfehlungen und personalisierte Lernpfade.
-              Der API-Key bleibt lokal in deinem Browser — er wird nicht an einen Server gesendet.
-            </p>
-            <div className="flex flex-col gap-1.5">
-              <Label>GLM API-Key</Label>
-              <div className="flex gap-2">
-                <Input
+      {/* GLM AI section */}
+      <Box component={motion.div} {...motionPresets.cardEnter(0.2)} sx={{ mb: 3 }}>
+        <Card sx={{ p: 3, bgcolor: "background.paper" }}>
+          <Typography variant="overline" color="text.secondary" fontWeight={600} sx={{ display: "block", mb: 1 }}>KI-Analyse (GLM)</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontSize: 12, lineHeight: 1.6 }}>
+            Optional: Verbinde ein GLM-Modell für KI-gestützte Auswertungen. Der API-Key bleibt lokal in deinem Browser.
+          </Typography>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <Box>
+              <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ mb: 0.5 }}>GLM API-Key</Typography>
+              <Box sx={{ display: "flex", gap: 1 }}>
+                <TextField
                   type={showApiKey ? "text" : "password"}
                   value={glmApiKey}
                   onChange={(e) => setGlmApiKey(e.target.value)}
                   placeholder="API-Key eingeben"
-                  className="font-mono text-sm"
+                  size="small"
+                  fullWidth
+                  sx={{ fontFamily: "monospace" }}
                 />
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-10 px-3"
-                  onClick={() => setShowApiKey((s) => !s)}
-                >
-                  {showApiKey ? "Verbergen" : "Zeigen"}
-                </Button>
-              </div>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label>Modell</Label>
-              <Select value={glmModel} onValueChange={setGlmModel}>
-                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="glm-4.7">GLM-4.7 (Empfohlen)</SelectItem>
-                  <SelectItem value="glm-4.6">GLM-4.6</SelectItem>
-                  <SelectItem value="glm-4-flash">GLM-4-Flash (Kostenlos)</SelectItem>
-                  <SelectItem value="glm-4v">GLM-4V (Vision)</SelectItem>
-                </SelectContent>
+                <IconButton onClick={() => setShowApiKey((s) => !s)} size="small" sx={{ border: "1px solid", borderColor: "divider" }}>
+                  {showApiKey ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                </IconButton>
+              </Box>
+            </Box>
+            <FormControl fullWidth size="small">
+              <InputLabel>Modell</InputLabel>
+              <Select value={glmModel} label="Modell" onChange={(e) => setGlmModel(e.target.value)}>
+                <MenuItem value="glm-4.7">GLM-4.7 (Empfohlen)</MenuItem>
+                <MenuItem value="glm-4.6">GLM-4.6</MenuItem>
+                <MenuItem value="glm-4-flash">GLM-4-Flash (Kostenlos)</MenuItem>
+                <MenuItem value="glm-4v">GLM-4V (Vision)</MenuItem>
               </Select>
-            </div>
-            <div className="flex items-center gap-2 rounded-lg border border-border bg-bg2/20 p-3">
-              <Sparkles className="h-4 w-4 shrink-0 text-ink-dim" />
-              <p className="text-xs leading-relaxed text-ink-dim">
-                Mit GLM erhältst du detaillierte Klassenarbeits-Auswertungen mit
-                psychologischer Einschätzung, Lernpfad-Empfehlungen und
-                automatisierten Themenvorschlägen. Bilder über Perchance werden
-                für visuelle Illustrationen im Bericht generiert.
-              </p>
-            </div>
-            <Button onClick={saveGlmKey} className="w-full">
-              <Key className="mr-2 h-4 w-4" /> API-Key speichern
+            </FormControl>
+            <Button variant="contained" startIcon={<VpnKeyIcon />} onClick={saveGlmKey} fullWidth>
+              API-Key speichern
             </Button>
-          </div>
-        </Section>
+          </Box>
+        </Card>
+      </Box>
 
-        {/* Player switch section */}
-        <Section title="Spieler wechseln">
-          <div className="flex flex-col gap-3">
-            <p className="text-sm text-ink-dim">
-              Wechsle zu einem anderen Spieler. Dein aktueller Fortschritt bleibt erhalten.
-            </p>
-            <Button variant="outline" className="w-full justify-start" onClick={switchPlayer}>
-              <LogOut className="mr-2 h-4 w-4" /> Spieler wechseln
+      {/* Data section */}
+      <Box component={motion.div} {...motionPresets.cardEnter(0.25)} sx={{ mb: 3 }}>
+        <Card sx={{ p: 3, bgcolor: "background.paper" }}>
+          <Typography variant="overline" color="text.secondary" fontWeight={600} sx={{ display: "block", mb: 2 }}>Daten</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontSize: 12, lineHeight: 1.6 }}>
+            Alle deine Daten werden lokal in deinem Browser gespeichert. Du kannst sie herunterladen oder löschen.
+          </Typography>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+            <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => void downloadData()} fullWidth>
+              Meine Daten herunterladen (JSON)
             </Button>
-          </div>
-        </Section>
-      </main>
+            <Button variant="outlined" color="error" startIcon={<DeleteIcon />} onClick={() => setDeleteDialogOpen(true)} fullWidth>
+              Konto löschen
+            </Button>
+          </Box>
+        </Card>
+      </Box>
 
+      {/* Player switch */}
+      <Box component={motion.div} {...motionPresets.cardEnter(0.3)}>
+        <Card sx={{ p: 3, bgcolor: "background.paper" }}>
+          <Button variant="outlined" startIcon={<LogoutIcon />} onClick={switchPlayer} fullWidth>
+            Spieler wechseln
+          </Button>
+        </Card>
+      </Box>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} PaperProps={{ sx: { bgcolor: "background.paper" } }}>
+        <DialogTitle>Wirklich löschen?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            Alle Spielstände und Statistiken werden gelöscht. Nicht rückgängig.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Abbrechen</Button>
+          <Button color="error" variant="contained" onClick={() => void deleteAccount()} disabled={deleting}>
+            {deleting ? "Lösche …" : "Endgültig löschen"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Footer */}
       {player && (
-        <p className="mt-6 text-center text-[11px] text-ink-dim/50">
+        <Typography variant="caption" color="text.secondary" sx={{ display: "block", textAlign: "center", mt: 3, opacity: 0.5 }}>
           {SCHOOL_TYPE_LABELS[player.schoolType] ?? player.schoolType} · Klasse {player.grade} · {prefs.sound ? "Sound an" : "Sound aus"}
-        </p>
+        </Typography>
       )}
-    </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-2xl border border-border bg-bg1/60 p-5 backdrop-blur">
-      <h2 className="mb-4 font-display text-xs font-semibold uppercase tracking-wider text-ink-dim">
-        {title}
-      </h2>
-      <div className="flex flex-col gap-4">{children}</div>
-    </div>
-  );
-}
-
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium text-ink">{label}</span>
-      {children}
-    </div>
+    </Container>
   );
 }
 
 function ToggleRow({
-  icon,
-  label,
-  description,
-  checked,
-  onCheckedChange,
+  icon, label, description, checked, onChange,
 }: {
-  icon?: React.ReactNode;
+  icon: React.ReactNode;
   label: string;
-  description?: string;
+  description: string;
   checked: boolean;
-  onCheckedChange: (v: boolean) => void;
+  onChange: (v: boolean) => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="flex min-w-0 flex-1 items-center gap-2.5">
-        {icon}
-        <div>
-          <div className="text-sm font-medium text-ink">{label}</div>
-          {description && <div className="text-xs text-ink-dim">{description}</div>}
-        </div>
-      </div>
-      <Switch checked={checked} onCheckedChange={onCheckedChange} />
-    </div>
+    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, py: 1.5 }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flex: 1, minWidth: 0 }}>
+        <Avatar variant="rounded" sx={{ width: 32, height: 32, bgcolor: "rgba(245, 243, 255, 0.06)", color: "text.secondary" }}>
+          {icon}
+        </Avatar>
+        <Box>
+          <Typography variant="body2" fontWeight={500} color="text.primary">{label}</Typography>
+          <Typography variant="caption" color="text.secondary">{description}</Typography>
+        </Box>
+      </Box>
+      <Switch checked={checked} onChange={(e) => onChange(e.target.checked)} />
+    </Box>
   );
 }

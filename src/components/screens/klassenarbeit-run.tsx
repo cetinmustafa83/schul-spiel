@@ -1,14 +1,28 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useApp } from "@/lib/store";
-import { Button } from "@/components/ui/button";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft, ArrowRight, Check, FileText, RotateCcw, Home,
-  ChevronLeft, ChevronRight, Timer, Pause, Play, AlertCircle, Brain, Clock, TrendingUp, Lightbulb,
-} from "lucide-react";
-import { useScreenTransition } from "@/lib/animations/gsap-hooks";
-import { cn } from "@/lib/utils";
+  Container, Box, Typography, Button, Card, CardContent, IconButton,
+  Avatar, LinearProgress, Dialog, Chip,
+} from "@mui/material";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import CheckIcon from "@mui/icons-material/Check";
+import TimerIcon from "@mui/icons-material/Timer";
+import PauseIcon from "@mui/icons-material/Pause";
+import PlayIcon from "@mui/icons-material/PlayArrow";
+import HomeIcon from "@mui/icons-material/Home";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import QuizIcon from "@mui/icons-material/Quiz";
+import BrainIcon from "@mui/icons-material/Psychology";
+import ClockIcon from "@mui/icons-material/Schedule";
+import TrendingUpIcon from "@mui/icons-material/TrendingUp";
+import LightbulbIcon from "@mui/icons-material/Lightbulb";
+import WarningIcon from "@mui/icons-material/Warning";
+import { useApp, type Screen } from "@/lib/store";
+import { motionPresets } from "@/lib/theme";
 import { sfxCorrect, sfxWrong, sfxSelect, sfxTickTack, sfxTimeUp } from "@/lib/audio/sfx";
 
 interface ExamQuestion {
@@ -34,41 +48,32 @@ interface ExamResult {
   grade: string;
 }
 
-const EXAM_DURATION = 40 * 60; // 40 minutes in seconds
+const EXAM_DURATION = 40 * 60;
 const LETTERS = ["A", "B", "C", "D"];
-const SHAPES = ["▲", "●", "■", "◆"];
 
 export function KlassenarbeitRunScreen() {
   const { payload, navigate, player, pushToast } = useApp();
-  const ref = useScreenTransition<HTMLDivElement>();
   const sessionId = payload?.sessionId as string;
   const questions = (payload?.questions as ExamQuestion[]) ?? [];
   const total = questions.length;
 
-  // --- Exam state ---
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number>>({});
+  const [answerChanges, setAnswerChanges] = useState<Record<number, number>>({});
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<ExamResult | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
 
-  // --- Timer state ---
   const [timeLeft, setTimeLeft] = useState(EXAM_DURATION);
   const [isPaused, setIsPaused] = useState(false);
   const [pauseUsed, setPauseUsed] = useState(false);
-  const [examStartedAt] = useState(Date.now());
-  const examStartRef = useRef<number>(Date.now());
   const pauseStartRef = useRef<number | null>(null);
-  const totalPausedRef = useRef<number>(0);
 
-  // --- Per-question time tracking ---
-  const [questionTimes, setQuestionTimes] = useState<Record<number, number>>({}); // qIdx → seconds spent
+  const [questionTimes, setQuestionTimes] = useState<Record<number, number>>({});
   const questionEnterRef = useRef<number>(Date.now());
   const lastQIdxRef = useRef<number>(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Track time when switching questions
   function goToQuestion(idx: number) {
-    // Save time spent on previous question
     const now = Date.now();
     const elapsed = Math.floor((now - questionEnterRef.current) / 1000);
     setQuestionTimes((prev) => ({
@@ -83,20 +88,15 @@ export function KlassenarbeitRunScreen() {
 
   function selectAnswer(qIdx: number, optIdx: number) {
     sfxSelect();
-    // Track if this is a change (dilemma indicator)
     setAnswers((prev) => {
       const wasAnswered = prev[qIdx] != null;
       if (wasAnswered && prev[qIdx] !== optIdx) {
-        // Answer changed — mark as "changed answer"
         setAnswerChanges((p) => ({ ...p, [qIdx]: (p[qIdx] ?? 0) + 1 }));
       }
       return { ...prev, [qIdx]: optIdx };
     });
   }
 
-  const [answerChanges, setAnswerChanges] = useState<Record<number, number>>({}); // qIdx → number of changes
-
-  // --- Timer countdown ---
   useEffect(() => {
     if (isPaused || result) return;
     const interval = setInterval(() => {
@@ -105,7 +105,6 @@ export function KlassenarbeitRunScreen() {
         if (next <= 10 && next > 0) sfxTickTack(next <= 3);
         if (next <= 0) {
           sfxTimeUp();
-          // Auto-submit
           void submitExam(true);
           return 0;
         }
@@ -115,7 +114,6 @@ export function KlassenarbeitRunScreen() {
     return () => clearInterval(interval);
   }, [isPaused, result]);
 
-  // Save question time on unmount
   useEffect(() => {
     return () => {
       const now = Date.now();
@@ -129,14 +127,8 @@ export function KlassenarbeitRunScreen() {
 
   function togglePause() {
     if (isPaused) {
-      // Resume
-      if (pauseStartRef.current) {
-        totalPausedRef.current += Date.now() - pauseStartRef.current;
-        pauseStartRef.current = null;
-      }
       setIsPaused(false);
     } else {
-      // Pause (only 1 allowed)
       if (pauseUsed) {
         pushToast("Du hast deine Pause bereits verwendet.", "info");
         return;
@@ -144,7 +136,7 @@ export function KlassenarbeitRunScreen() {
       pauseStartRef.current = Date.now();
       setIsPaused(true);
       setPauseUsed(true);
-      pushToast("Pause gestartet — WC-Pause. Klicke zum Fortsetzen.", "info");
+      pushToast("Pause gestartet. Klicke zum Fortsetzen.", "info");
     }
   }
 
@@ -161,7 +153,6 @@ export function KlassenarbeitRunScreen() {
         if (!confirm(`Du hast ${unanswered} Frage(n) nicht beantwortet. Trotzdem abgeben?`)) return;
       }
     }
-    // Save time for last question
     const now = Date.now();
     const elapsed = Math.floor((now - questionEnterRef.current) / 1000);
     setQuestionTimes((prev) => ({
@@ -173,7 +164,7 @@ export function KlassenarbeitRunScreen() {
     try {
       for (let i = 0; i < total; i++) {
         if (answers[i] != null) {
-          await fetch(`/api/games/${sessionId}/answer`, {
+          await fetch(`/api/klassenarbeit/${sessionId}/answer`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ questionRef: questions[i].ref, optionIndex: answers[i] }),
@@ -185,7 +176,6 @@ export function KlassenarbeitRunScreen() {
       setResult(data);
       if (data.percentage >= 50) sfxCorrect(); else sfxWrong();
 
-      // LokiJS save
       if (player?.name) {
         const { addGameHistory, addSeenQuestion, addToReviewDeck, upsertTopicMastery, updatePlayer } = await import("@/lib/browser-db");
         await updatePlayer(player.name, { xp: (player.xp ?? 0) + data.correctCount * 8 });
@@ -206,27 +196,24 @@ export function KlassenarbeitRunScreen() {
     }
   }
 
-  // ====== RESULT / REPORT SCREEN ======
   if (result) {
     return <ExamReport
       result={result}
       questionTimes={questionTimes}
       answerChanges={answerChanges}
       totalTime={EXAM_DURATION - timeLeft}
-      player={player}
       navigate={navigate}
     />;
   }
 
-  // ====== EXAM SCREEN ======
   if (questions.length === 0) {
     return (
-      <div className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-4 py-8 text-center">
-        <div className="text-4xl">📝</div>
-        <h1 className="mt-3 font-display text-xl font-bold text-ink">Keine Fragen</h1>
-        <p className="mt-2 text-sm text-ink-dim">Die Klassenarbeit konnte nicht geladen werden.</p>
-        <Button className="mt-6" variant="outline" onClick={() => navigate("home")}>Zum Menü</Button>
-      </div>
+      <Container maxWidth="sm" sx={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
+        <QuizIcon sx={{ fontSize: 56, color: "text.secondary", mb: 2 }} />
+        <Typography variant="h6" fontWeight={700}>Keine Fragen</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Die Klassenarbeit konnte nicht geladen werden.</Typography>
+        <Button variant="outlined" onClick={() => navigate("home")} sx={{ mt: 3 }}>Zum Menü</Button>
+      </Container>
     );
   }
 
@@ -235,150 +222,183 @@ export function KlassenarbeitRunScreen() {
   const timeUrgent = timeLeft <= 60;
 
   return (
-    <div ref={ref} className="mx-auto flex min-h-screen max-w-3xl flex-col px-4 py-4 sm:px-6">
-      {/* Top bar with timer */}
-      <header className="mb-4 flex items-center justify-between gap-2">
-        <button
-          type="button"
+    <Container maxWidth="md" sx={{ minHeight: "100vh", py: 3, display: "flex", flexDirection: "column" }}>
+      {/* Top bar */}
+      <Box component={motion.div} {...motionPresets.itemEnter(0)} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, mb: 2 }}>
+        <Button
+          size="small"
+          startIcon={<ArrowBackIcon />}
           onClick={() => {
             if (confirm("Klassenarbeit wirklich verlassen? Dein Fortschritt geht verloren.")) navigate("home");
           }}
-          className="tap-target inline-flex items-center gap-1 rounded-full bg-bg2/40 px-3 py-1.5 text-sm text-ink-dim hover:text-ink"
+          sx={{ color: "text.secondary" }}
         >
-          <ArrowLeft className="h-4 w-4" /> Verlassen
-        </button>
-        <div className="flex items-center gap-2">
-          {/* Timer */}
-          <div className={cn(
-            "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-display tabular-nums transition-all",
-            isPaused ? "bg-sky/20 text-sky" : timeUrgent ? "bg-coral/20 text-coral animate-pulse" : "bg-bg2/40 text-ink-dim"
-          )}>
-            <Timer className="h-3.5 w-3.5" />
-            {isPaused ? "PAUSE" : formatTime(timeLeft)}
-          </div>
-          {/* Pause button */}
-          <button
-            type="button"
+          Verlassen
+        </Button>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Chip
+            icon={<TimerIcon sx={{ fontSize: 16 }} />}
+            label={isPaused ? "PAUSE" : formatTime(timeLeft)}
+            size="small"
+            sx={{
+              bgcolor: isPaused ? "rgba(92, 200, 255, 0.15)" : timeUrgent ? "rgba(255, 107, 122, 0.15)" : "rgba(245, 243, 255, 0.05)",
+              color: isPaused ? "info.main" : timeUrgent ? "error.main" : "text.secondary",
+              fontWeight: 600,
+              animation: timeUrgent && !isPaused ? "pulse 1s infinite" : "none",
+              "@keyframes pulse": { "0%,100%": { opacity: 1 }, "50%": { opacity: 0.6 } },
+            }}
+          />
+          <IconButton
             onClick={togglePause}
             disabled={!isPaused && pauseUsed}
-            className={cn(
-              "tap-target flex items-center justify-center rounded-full p-2 transition-all",
-              isPaused ? "bg-mint/20 text-mint hover:bg-mint/30" : pauseUsed ? "bg-bg2/20 text-ink-dim/30" : "bg-bg2/40 text-ink-dim hover:text-ink"
-            )}
-            title={isPaused ? "Fortsetzen" : pauseUsed ? "Pause verbraucht" : "Pause (1× möglich)"}
+            size="small"
+            sx={{
+              bgcolor: isPaused ? "rgba(61, 219, 164, 0.15)" : "rgba(245, 243, 255, 0.05)",
+              color: isPaused ? "success.main" : "text.secondary",
+              "&:hover": { bgcolor: "rgba(139, 108, 255, 0.15)" },
+            }}
           >
-            {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
-          </button>
-          {/* Progress */}
-          <div className="flex items-center gap-1.5 rounded-full bg-bg2/40 px-3 py-1.5 text-sm font-display tabular-nums text-ink-dim">
-            {answeredCount}/{total}
-          </div>
-        </div>
-      </header>
-
-      {/* Pause overlay */}
-      {isPaused && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg0/80 backdrop-blur-xl">
-          <div className="flex flex-col items-center gap-4 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-sky/30 bg-sky/10">
-              <Pause className="h-8 w-8 text-sky" />
-            </div>
-            <h2 className="font-display text-xl font-bold text-ink">Pause</h2>
-            <p className="text-sm text-ink-dim">Der Timer ist gestoppt. Klicke zum Fortsetzen.</p>
-            <Button onClick={togglePause} className="h-12 px-8">
-              <Play className="mr-2 h-4 w-4" /> Fortsetzen
-            </Button>
-          </div>
-        </div>
-      )}
+            {isPaused ? <PlayIcon /> : <PauseIcon />}
+          </IconButton>
+          <Chip label={`${answeredCount}/${total}`} size="small" sx={{ bgcolor: "rgba(245, 243, 255, 0.05)", color: "text.secondary", fontWeight: 600 }} />
+        </Box>
+      </Box>
 
       {/* Question navigation dots */}
-      <div className="mb-4 flex flex-wrap gap-1.5">
-        {questions.map((_, idx) => (
-          <button
-            key={idx}
-            type="button"
-            onClick={() => goToQuestion(idx)}
-            className={cn(
-              "flex h-7 w-7 items-center justify-center rounded-md border text-[10px] font-mono transition-all",
-              idx === currentIdx ? "border-ink-dim/40 bg-bg1/70 text-ink"
-              : answers[idx] != null ? "border-mint/30 bg-mint/10 text-mint/70"
-              : "border-border bg-bg1/30 text-ink-dim/50"
-            )}
-          >{idx + 1}</button>
-        ))}
-      </div>
+      <Box component={motion.div} {...motionPresets.itemEnter(0.05)} sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mb: 2 }}>
+        {questions.map((_, idx) => {
+          const isCurrent = idx === currentIdx;
+          const isAnswered = answers[idx] != null;
+          return (
+            <Box
+              key={idx}
+              onClick={() => goToQuestion(idx)}
+              sx={{
+                cursor: "pointer",
+                width: 28, height: 28,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                borderRadius: 1,
+                fontSize: 10,
+                fontFamily: "monospace",
+                border: "1px solid",
+                borderColor: isCurrent ? "primary.main" : isAnswered ? "success.main" : "divider",
+                bgcolor: isCurrent ? "rgba(139, 108, 255, 0.12)" : isAnswered ? "rgba(61, 219, 164, 0.1)" : "transparent",
+                color: isCurrent ? "primary.light" : isAnswered ? "success.main" : "text.secondary",
+                transition: "all 0.2s",
+                "&:hover": { transform: "scale(1.1)" },
+              }}
+            >
+              {idx + 1}
+            </Box>
+          );
+        })}
+      </Box>
 
-      <main ref={scrollRef} className="flex-1 overflow-y-auto">
-        <div
-          className="rounded-2xl p-5 backdrop-blur"
-          style={{
-            background: "linear-gradient(135deg, rgba(40,38,80,0.7), rgba(28,26,68,0.9))",
-            border: "1px solid rgba(106,122,154,0.2)",
-          }}
-        >
-          <div className="mb-3 flex items-center justify-between text-xs">
-            <span className="inline-flex items-center gap-2 rounded-full bg-bg2/60 px-3 py-1 font-medium text-ink">
-              <span aria-hidden>{currentQuestion.subject.icon ?? "📚"}</span>
-              {currentQuestion.subject.label}
-            </span>
-            <span className="text-[10px] uppercase tracking-wider text-ink-dim">
-              {currentQuestion.topic.label}
-            </span>
-          </div>
-          <h2 className="font-display text-lg sm:text-xl font-semibold leading-snug text-ink" style={{ fontSize: "clamp(1.1rem, 1.5vw + 0.6rem, 1.6rem)" }}>
-            {currentQuestion.text}
-          </h2>
-          <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-            {currentQuestion.options.map((opt, optIdx) => {
-              const isSelected = answers[currentIdx] === optIdx;
-              return (
-                <button
-                  key={optIdx}
-                  type="button"
-                  onClick={() => selectAnswer(currentIdx, optIdx)}
-                  className={cn(
-                    "flex items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition-all",
-                    isSelected ? "border-ink-dim/40 bg-bg2/50" : "border-border bg-bg1/40 hover:border-ink-dim/20"
-                  )}
-                  style={isSelected ? { boxShadow: "0 0 12px rgba(106,122,154,0.15)" } : undefined}
-                >
-                  <span className={cn(
-                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold",
-                    isSelected ? "bg-ink text-bg0" : "bg-bg2/40 text-ink-dim"
-                  )}>{LETTERS[optIdx]}</span>
-                  <span className="flex-1 text-sm text-ink">{opt}</span>
-                  {isSelected && <Check className="h-4 w-4 text-ink-dim" />}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </main>
+      {/* Pause overlay */}
+      <Dialog open={isPaused} fullWidth maxWidth="xs" PaperProps={{ sx: { bgcolor: "background.paper", backdropFilter: "blur(20px)" } }}>
+        <Box sx={{ p: 4, textAlign: "center" }}>
+          <Avatar sx={{ width: 64, height: 64, mx: "auto", mb: 2, bgcolor: "rgba(92, 200, 255, 0.15)" }}>
+            <PauseIcon sx={{ fontSize: 32, color: "info.main" }} />
+          </Avatar>
+          <Typography variant="h5" fontWeight={800}>Pause</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Der Timer ist gestoppt. Klicke zum Fortsetzen.</Typography>
+          <Button variant="contained" startIcon={<PlayIcon />} onClick={togglePause} sx={{ mt: 3, px: 4, borderRadius: 999 }}>
+            Fortsetzen
+          </Button>
+        </Box>
+      </Dialog>
 
-      <footer className="mt-4 flex items-center gap-2">
-        <Button variant="outline" className="h-12 px-4" onClick={() => goToQuestion(Math.max(0, currentIdx - 1))} disabled={currentIdx === 0}>
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
+      {/* Question card */}
+      <Box ref={scrollRef} component="main" sx={{ flex: 1, overflowY: "auto" }}>
+        <AnimatePresence mode="wait">
+          <Box
+            key={currentIdx}
+            component={motion.div}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.25 }}
+          >
+            <Card sx={{ p: 3, bgcolor: "background.paper", border: "1px solid", borderColor: "divider" }}>
+              <CardContent sx={{ p: 0, "&:last-child": { pb: 0 } }}>
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+                  <Chip
+                    label={`${currentQuestion.subject.icon ?? "📚"} ${currentQuestion.subject.label}`}
+                    size="small"
+                    sx={{ bgcolor: "rgba(245, 243, 255, 0.06)", color: "text.primary", fontWeight: 500 }}
+                  />
+                  <Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    {currentQuestion.topic.label}
+                  </Typography>
+                </Box>
+                <Typography variant="h6" fontWeight={600} color="text.primary" sx={{ lineHeight: 1.4, fontSize: "clamp(1.1rem, 1.5vw + 0.6rem, 1.5rem)" }}>
+                  {currentQuestion.text}
+                </Typography>
+                <Box sx={{ mt: 3, display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1.5 }}>
+                  {currentQuestion.options.map((opt, optIdx) => {
+                    const isSelected = answers[currentIdx] === optIdx;
+                    return (
+                      <Box
+                        key={optIdx}
+                        onClick={() => selectAnswer(currentIdx, optIdx)}
+                        sx={{
+                          cursor: "pointer",
+                          display: "flex", alignItems: "center", gap: 1.5,
+                          p: 1.5, borderRadius: 2,
+                          border: "2px solid",
+                          borderColor: isSelected ? "primary.main" : "divider",
+                          bgcolor: isSelected ? "rgba(139, 108, 255, 0.1)" : "rgba(245, 243, 255, 0.03)",
+                          boxShadow: isSelected ? "0 0 12px rgba(139, 108, 255, 0.2)" : "none",
+                          transition: "all 0.2s",
+                          "&:hover": { borderColor: "primary.light" },
+                        }}
+                      >
+                        <Box sx={{
+                          width: 32, height: 32, shrink: 0,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          borderRadius: "50%",
+                          bgcolor: isSelected ? "primary.main" : "rgba(245, 243, 255, 0.08)",
+                          color: isSelected ? "#0E0A28" : "text.secondary",
+                          fontSize: 13, fontWeight: 700,
+                        }}>
+                          {LETTERS[optIdx]}
+                        </Box>
+                        <Typography variant="body2" sx={{ flex: 1, color: "text.primary" }}>{opt}</Typography>
+                        {isSelected && <CheckIcon sx={{ color: "primary.light", fontSize: 18 }} />}
+                      </Box>
+                    );
+                  })}
+                </Box>
+              </CardContent>
+            </Card>
+          </Box>
+        </AnimatePresence>
+      </Box>
+
+      {/* Footer navigation */}
+      <Box component={motion.div} {...motionPresets.itemEnter(0.1)} sx={{ display: "flex", gap: 1, mt: 2 }}>
+        <IconButton onClick={() => goToQuestion(Math.max(0, currentIdx - 1))} disabled={currentIdx === 0} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, px: 1.5 }}>
+          <ChevronLeftIcon />
+        </IconButton>
         {currentIdx < total - 1 ? (
-          <Button className="h-12 flex-1 font-display font-bold" onClick={() => goToQuestion(currentIdx + 1)}>
-            Weiter <ChevronRight className="ml-2 h-4 w-4" />
+          <Button variant="contained" fullWidth onClick={() => goToQuestion(currentIdx + 1)} endIcon={<ChevronRightIcon />} sx={{ borderRadius: 2 }}>
+            Weiter
           </Button>
         ) : (
-          <Button className="h-12 flex-1 font-display font-bold" onClick={() => void submitExam()} disabled={submitting}>
+          <Button variant="contained" fullWidth onClick={() => void submitExam()} disabled={submitting} sx={{ borderRadius: 2 }}>
             {submitting ? "Wird ausgewertet …" : `Abgeben (${answeredCount}/${total})`}
           </Button>
         )}
-        <Button variant="outline" className="h-12 px-4" onClick={() => goToQuestion(Math.min(total - 1, currentIdx + 1))} disabled={currentIdx === total - 1}>
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-      </footer>
-    </div>
+        <IconButton onClick={() => goToQuestion(Math.min(total - 1, currentIdx + 1))} disabled={currentIdx === total - 1} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, px: 1.5 }}>
+          <ChevronRightIcon />
+        </IconButton>
+      </Box>
+    </Container>
   );
 }
 
 // ============================================================================
-// EXAM REPORT — premium analysis screen
+// EXAM REPORT
 // ============================================================================
 
 interface ExamReportProps {
@@ -386,21 +406,18 @@ interface ExamReportProps {
   questionTimes: Record<number, number>;
   answerChanges: Record<number, number>;
   totalTime: number;
-  player: { name: string; schoolType: string; grade: number; xp: number } | null;
-  navigate: (s: never) => void;
+  navigate: (s: Screen) => void;
 }
 
-function ExamReport({ result, questionTimes, answerChanges, totalTime, player, navigate }: ExamReportProps) {
-  const ref = useScreenTransition<HTMLDivElement>();
+function ExamReport({ result, questionTimes, answerChanges, totalTime, navigate }: ExamReportProps) {
   const { results, correctCount, total, percentage, grade } = result;
 
-  // Analysis
   const avgTimePerQuestion = total > 0 ? Math.round(totalTime / total) : 0;
-  const slowestQuestion = results.reduce((max, r, idx) => {
+  const slowestQuestion = results.reduce((max, _r, idx) => {
     const t = questionTimes[idx] ?? 0;
     return t > (questionTimes[max] ?? 0) ? idx : max;
   }, 0);
-  const fastestQuestion = results.reduce((min, r, idx) => {
+  const fastestQuestion = results.reduce((min, _r, idx) => {
     const t = questionTimes[idx] ?? Infinity;
     return t < (questionTimes[min] ?? Infinity) ? idx : min;
   }, 0);
@@ -409,13 +426,11 @@ function ExamReport({ result, questionTimes, answerChanges, totalTime, player, n
   const correctAfterChange = changedAnswers.filter(([idx]) => results[Number(idx)]?.correct).length;
   const wrongAfterChange = changedCount - correctAfterChange;
 
-  // Dilemma detection: spent >2x avg time AND changed answer
-  const dilemmas = results.filter((r, idx) => {
+  const dilemmas = results.filter((_r, idx) => {
     const t = questionTimes[idx] ?? 0;
     return t > avgTimePerQuestion * 2 && (answerChanges[idx] ?? 0) > 0;
   });
 
-  // Topic breakdown
   const topicStats: Record<string, { correct: number; total: number; time: number }> = {};
   results.forEach((r, idx) => {
     const key = r.topic.label;
@@ -425,9 +440,8 @@ function ExamReport({ result, questionTimes, answerChanges, totalTime, player, n
     topicStats[key].time += questionTimes[idx] ?? 0;
   });
 
-  // Psychological assessment
   const confidence = changedCount === 0 ? "Sehr selbstsicher — du hast keine Antwort geändert." :
-    correctAfterChange > wrongAfterChange ? "Gute Selbstkontontrolle — Änderungen waren meist richtig." :
+    correctAfterChange > wrongAfterChange ? "Gute Selbstkontrolle — Änderungen waren meist richtig." :
     "Unsicherheit erkannt — Änderungen waren oft falsch. Vertraue deinem ersten Instinkt mehr.";
 
   const pace = avgTimePerQuestion < 30 ? "Sehr schnell — nimm dir mehr Zeit für schwierige Fragen." :
@@ -444,206 +458,193 @@ function ExamReport({ result, questionTimes, answerChanges, totalTime, player, n
     return `${m}m ${s}s`;
   }
 
+  const statCards = [
+    { icon: <CheckIcon />, label: "Richtig", value: String(correctCount), color: "success.main" as const },
+    { icon: <WarningIcon />, label: "Falsch", value: String(total - correctCount), color: "error.main" as const },
+    { icon: <ClockIcon />, label: "Ø Zeit/Frage", value: formatTime(avgTimePerQuestion), color: "info.main" as const },
+    { icon: <TrendingUpIcon />, label: "Antwort geändert", value: String(changedCount), color: "primary.main" as const },
+  ];
+
+  const assessments = [
+    { icon: <BrainIcon />, title: "Selbstvertrauen", text: confidence },
+    { icon: <ClockIcon />, title: "Tempo", text: pace },
+    { icon: <LightbulbIcon />, title: "Fokus", text: focus },
+  ];
+
   return (
-    <div ref={ref} className="mx-auto flex min-h-screen max-w-3xl flex-col px-4 py-6 sm:px-6">
+    <Container maxWidth="md" sx={{ minHeight: "100vh", py: 4 }}>
       {/* Header */}
-      <header className="mb-6 text-center">
-        <div className="mb-4 flex h-16 w-16 mx-auto items-center justify-center rounded-2xl border border-border bg-bg1/60">
-          <FileText className="h-8 w-8 text-ink-dim" />
-        </div>
-        <h1 className="font-display text-3xl font-extrabold tracking-tight text-ink">
+      <Box component={motion.div} {...motionPresets.pageEnter} sx={{ textAlign: "center", mb: 4 }}>
+        <Avatar sx={{ width: 64, height: 64, mx: "auto", mb: 2, bgcolor: "rgba(139, 108, 255, 0.15)" }}>
+          <QuizIcon sx={{ color: "primary.light" }} />
+        </Avatar>
+        <Typography variant="h3" fontWeight={800} color="text.primary">
           {correctCount} / {total}
-        </h1>
-        <p className="mt-1 text-sm text-ink-dim">
-          Note: <span className="font-display font-bold text-ink">{grade}</span> · {percentage}%
-        </p>
-      </header>
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          Note: <Box component="span" fontWeight={700} color="text.primary">{grade}</Box> · {percentage}%
+        </Typography>
+      </Box>
 
       {/* Stats grid */}
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard icon={<Check className="h-4 w-4" />} label="Richtig" value={String(correctCount)} color="mint" />
-        <StatCard icon={<AlertCircle className="h-4 w-4" />} label="Falsch" value={String(total - correctCount)} color="coral" />
-        <StatCard icon={<Clock className="h-4 w-4" />} label="Ø Zeit/Frage" value={formatTime(avgTimePerQuestion)} color="sky" />
-        <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Antwort geändert" value={String(changedCount)} color="violet" />
-      </div>
+      <Box component={motion.div} {...motionPresets.itemEnter(0.1)} sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "1fr 1fr 1fr 1fr" }, gap: 1.5, mb: 4 }}>
+        {statCards.map((s, idx) => (
+          <Box key={idx} component={motion.div} {...motionPresets.cardEnter(0.05 * idx)}>
+            <Card sx={{ p: 2, textAlign: "center", bgcolor: "background.paper" }}>
+              <Box sx={{ color: s.color, mb: 0.5, display: "flex", justifyContent: "center" }}>{s.icon}</Box>
+              <Typography variant="h5" fontWeight={800} sx={{ color: s.color }}>{s.value}</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.label}</Typography>
+            </Card>
+          </Box>
+        ))}
+      </Box>
 
       {/* Psychological assessment */}
-      <section className="mb-6">
-        <h2 className="mb-3 font-display text-xs font-semibold uppercase tracking-wider text-ink-dim">
-          Auswertung
-        </h2>
-        <div className="flex flex-col gap-3">
-          <AssessmentCard icon={<Brain className="h-4 w-4" />} title="Selbstvertrauen" text={confidence} />
-          <AssessmentCard icon={<Clock className="h-4 w-4" />} title="Tempo" text={pace} />
-          <AssessmentCard icon={<Lightbulb className="h-4 w-4" />} title="Fokus" text={focus} />
-        </div>
-      </section>
+      <Box component={motion.div} {...motionPresets.itemEnter(0.2)} sx={{ mb: 4 }}>
+        <Typography variant="overline" color="text.secondary" fontWeight={600} sx={{ display: "block", mb: 2 }}>Auswertung</Typography>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+          {assessments.map((a, idx) => (
+            <Box key={idx} component={motion.div} {...motionPresets.itemEnter(0.05 * idx)}>
+              <Card sx={{ p: 2, display: "flex", gap: 2, bgcolor: "background.paper" }}>
+                <Avatar variant="rounded" sx={{ width: 36, height: 36, bgcolor: "rgba(245, 243, 255, 0.06)", color: "text.secondary" }}>
+                  {a.icon}
+                </Avatar>
+                <Box>
+                  <Typography variant="body2" fontWeight={600} color="text.primary">{a.title}</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, lineHeight: 1.6 }}>{a.text}</Typography>
+                </Box>
+              </Card>
+            </Box>
+          ))}
+        </Box>
+      </Box>
 
       {/* Dilemma detection */}
       {dilemmas.length > 0 && (
-        <section className="mb-6">
-          <h2 className="mb-3 font-display text-xs font-semibold uppercase tracking-wider text-ink-dim">
+        <Box component={motion.div} {...motionPresets.itemEnter(0.3)} sx={{ mb: 4 }}>
+          <Typography variant="overline" color="error.main" fontWeight={600} sx={{ display: "block", mb: 2 }}>
             Ikilem Tespiti ({dilemmas.length})
-          </h2>
-          <div className="rounded-xl border border-coral/25 bg-coral/5 p-4 backdrop-blur">
-            <div className="flex flex-col gap-2">
-              {dilemmas.map((r, idx) => {
+          </Typography>
+          <Card sx={{ p: 2, bgcolor: "rgba(255, 107, 122, 0.05)", border: "1px solid", borderColor: "error.main" }}>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              {dilemmas.map((r) => {
                 const realIdx = results.indexOf(r);
                 return (
-                  <div key={r.ref} className="flex items-center justify-between text-sm">
-                    <span className="text-ink-dim">
-                      Frage {realIdx + 1}: <span className="text-ink">{r.topic.label}</span>
-                    </span>
-                    <span className="text-coral">{formatTime(questionTimes[realIdx] ?? 0)} · {answerChanges[realIdx] ?? 0}× geändert</span>
-                  </div>
+                  <Box key={r.ref} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Frage {realIdx + 1}: <Box component="span" color="text.primary">{r.topic.label}</Box>
+                    </Typography>
+                    <Typography variant="body2" color="error.main" fontWeight={600}>
+                      {formatTime(questionTimes[realIdx] ?? 0)} · {answerChanges[realIdx] ?? 0}× geändert
+                    </Typography>
+                  </Box>
                 );
               })}
-            </div>
-            <p className="mt-3 text-xs text-ink-dim leading-relaxed">
+            </Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2, fontSize: 12, lineHeight: 1.6 }}>
               Diese Fragen haben dich besonders lange beschäftigt und du hast deine Antwort geändert.
               Das deutet auf Unsicherheit hin — wiederhole diese Themen!
-            </p>
-          </div>
-        </section>
+            </Typography>
+          </Card>
+        </Box>
       )}
 
       {/* Topic breakdown */}
-      <section className="mb-6">
-        <h2 className="mb-3 font-display text-xs font-semibold uppercase tracking-wider text-ink-dim">
-          Themen-Übersicht
-        </h2>
-        <div className="flex flex-col gap-2">
-          {Object.entries(topicStats).map(([topic, stats]) => {
+      <Box component={motion.div} {...motionPresets.itemEnter(0.35)} sx={{ mb: 4 }}>
+        <Typography variant="overline" color="text.secondary" fontWeight={600} sx={{ display: "block", mb: 2 }}>Themen-Übersicht</Typography>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+          {Object.entries(topicStats).map(([topic, stats], idx) => {
             const pct = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0;
             return (
-              <div key={topic} className="flex items-center gap-3 rounded-lg border border-border bg-bg1/40 p-3 backdrop-blur">
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-ink">{topic}</div>
-                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-bg2/30">
-                    <div
-                      className={cn("h-full transition-all", pct >= 50 ? "bg-mint/60" : "bg-coral/60")}
-                      style={{ width: `${pct}%` }}
+              <Box key={topic} component={motion.div} {...motionPresets.itemEnter(0.03 * idx)}>
+                <Card sx={{ p: 1.5, display: "flex", alignItems: "center", gap: 2, bgcolor: "background.paper" }}>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" fontWeight={500} color="text.primary">{topic}</Typography>
+                    <LinearProgress
+                      variant="determinate"
+                      value={pct}
+                      sx={{
+                        mt: 0.75, height: 8, borderRadius: 4,
+                        bgcolor: "rgba(245, 243, 255, 0.08)",
+                        "& .MuiLinearProgress-bar": {
+                          bgcolor: pct >= 50 ? "success.main" : "error.main",
+                          borderRadius: 4,
+                        },
+                      }}
                     />
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="font-display text-sm font-bold text-ink tabular-nums">{stats.correct}/{stats.total}</div>
-                  <div className="text-[10px] text-ink-dim">{formatTime(stats.time)}</div>
-                </div>
-              </div>
+                  </Box>
+                  <Box sx={{ textAlign: "right" }}>
+                    <Typography variant="body2" fontWeight={700} color="text.primary">{stats.correct}/{stats.total}</Typography>
+                    <Typography variant="caption" color="text.secondary">{formatTime(stats.time)}</Typography>
+                  </Box>
+                </Card>
+              </Box>
             );
           })}
-        </div>
-      </section>
+        </Box>
+      </Box>
 
       {/* Per-question detail */}
-      <section className="mb-6">
-        <h2 className="mb-3 font-display text-xs font-semibold uppercase tracking-wider text-ink-dim">
-          Frage-Detail
-        </h2>
-        <div className="flex flex-col gap-3">
+      <Box component={motion.div} {...motionPresets.itemEnter(0.4)} sx={{ mb: 4 }}>
+        <Typography variant="overline" color="text.secondary" fontWeight={600} sx={{ display: "block", mb: 2 }}>Frage-Detail</Typography>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
           {results.map((r, idx) => {
             const time = questionTimes[idx] ?? 0;
             const changes = answerChanges[idx] ?? 0;
             const isSlow = time > avgTimePerQuestion * 1.5;
             return (
-              <div
-                key={r.ref}
-                className="rounded-xl border p-4 backdrop-blur"
-                style={{
-                  borderColor: r.correct ? "rgba(61,219,164,0.2)" : "rgba(255,107,122,0.2)",
-                  background: r.correct ? "rgba(61,219,164,0.03)" : "rgba(255,107,122,0.03)",
-                }}
-              >
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-[10px] uppercase tracking-wider text-ink-dim">
-                    Frage {idx + 1} · {r.topic.label}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    {changes > 0 && (
-                      <span className="rounded bg-coral/15 px-1.5 py-0.5 text-[9px] font-bold text-coral">
-                        {changes}× geändert
-                      </span>
-                    )}
-                    {isSlow && (
-                      <span className="rounded bg-sky/15 px-1.5 py-0.5 text-[9px] font-bold text-sky">
-                        langsam
-                      </span>
-                    )}
-                    <span className={cn("text-xs font-bold", r.correct ? "text-mint" : "text-coral")}>
-                      {r.correct ? "✓" : "✕"}
-                    </span>
-                  </div>
-                </div>
-                <p className="text-sm text-ink leading-relaxed">{r.text}</p>
-                <div className="mt-2 grid grid-cols-1 gap-1">
-                  {r.options.map((opt, optIdx) => {
-                    const isCorrect = optIdx === r.correctIndex;
-                    const isAnswered = optIdx === r.answeredIndex;
-                    return (
-                      <div
-                        key={optIdx}
-                        className={cn(
-                          "flex items-center gap-2 rounded-lg px-3 py-1 text-sm",
-                          isCorrect ? "bg-mint/15 text-mint" : isAnswered ? "bg-coral/15 text-coral" : "text-ink-dim"
-                        )}
-                      >
-                        <span className="font-mono text-xs">{LETTERS[optIdx]}</span>
-                        {opt}
-                        {isCorrect && <Check className="ml-auto h-3.5 w-3.5" />}
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="mt-2 flex items-center justify-between border-t border-border/50 pt-2">
-                  <p className="flex-1 text-xs leading-relaxed text-ink-dim">{r.explanation}</p>
-                  <span className="ml-3 shrink-0 text-[10px] tabular-nums text-ink-dim">{formatTime(time)}</span>
-                </div>
-              </div>
+              <Box key={r.ref} component={motion.div} {...motionPresets.itemEnter(0.02 * idx)}>
+                <Card sx={{ p: 2, bgcolor: r.correct ? "rgba(61, 219, 164, 0.03)" : "rgba(255, 107, 122, 0.03)", border: "1px solid", borderColor: r.correct ? "success.main" : "error.main" }}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                      Frage {idx + 1} · {r.topic.label}
+                    </Typography>
+                    <Box sx={{ display: "flex", gap: 0.5 }}>
+                      {changes > 0 && <Chip label={`${changes}× geändert`} size="small" sx={{ bgcolor: "rgba(255, 107, 122, 0.15)", color: "error.main", fontSize: 10, height: 20 }} />}
+                      {isSlow && <Chip label="langsam" size="small" sx={{ bgcolor: "rgba(92, 200, 255, 0.15)", color: "info.main", fontSize: 10, height: 20 }} />}
+                      <Typography variant="body2" fontWeight={700} color={r.correct ? "success.main" : "error.main"}>
+                        {r.correct ? "✓" : "✕"}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Typography variant="body2" color="text.primary" sx={{ lineHeight: 1.6, mb: 1 }}>{r.text}</Typography>
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                    {r.options.map((opt, optIdx) => {
+                      const isCorrect = optIdx === r.correctIndex;
+                      const isAnswered = optIdx === r.answeredIndex;
+                      return (
+                        <Box key={optIdx} sx={{
+                          display: "flex", alignItems: "center", gap: 1,
+                          px: 1.5, py: 0.5, borderRadius: 1,
+                          bgcolor: isCorrect ? "rgba(61, 219, 164, 0.15)" : isAnswered ? "rgba(255, 107, 122, 0.15)" : "transparent",
+                        }}>
+                          <Typography variant="caption" fontFamily="monospace" color={isCorrect ? "success.main" : isAnswered ? "error.main" : "text.secondary"}>{LETTERS[optIdx]}</Typography>
+                          <Typography variant="body2" color={isCorrect ? "success.main" : isAnswered ? "error.main" : "text.secondary"}>{opt}</Typography>
+                          {isCorrect && <CheckIcon sx={{ ml: "auto", color: "success.main", fontSize: 16 }} />}
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderTop: "1px solid", borderColor: "divider", pt: 1, mt: 1 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ flex: 1, fontSize: 12, lineHeight: 1.6 }}>{r.explanation}</Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ ml: 2, whiteSpace: "nowrap" }}>{formatTime(time)}</Typography>
+                  </Box>
+                </Card>
+              </Box>
             );
           })}
-        </div>
-      </section>
+        </Box>
+      </Box>
 
       {/* Actions */}
-      <div className="mt-6 flex gap-3">
-        <Button variant="outline" className="h-12 flex-1" onClick={() => navigate("klassenarbeit-setup" as never)}>
-          <RotateCcw className="mr-2 h-4 w-4" /> Neue Klassenarbeit
+      <Box component={motion.div} {...motionPresets.itemEnter(0.5)} sx={{ display: "flex", gap: 1.5, mt: 2 }}>
+        <Button variant="outlined" fullWidth startIcon={<RefreshIcon />} onClick={() => navigate("klassenarbeit-setup")} sx={{ borderRadius: 2, py: 1.5 }}>
+          Neue Klassenarbeit
         </Button>
-        <Button variant="outline" className="h-12 flex-1" onClick={() => navigate("home" as never)}>
-          <Home className="mr-2 h-4 w-4" /> Zum Menü
+        <Button variant="outlined" fullWidth startIcon={<HomeIcon />} onClick={() => navigate("home")} sx={{ borderRadius: 2, py: 1.5 }}>
+          Zum Menü
         </Button>
-      </div>
-    </div>
-  );
-}
-
-function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color: string }) {
-  const colorMap: Record<string, string> = {
-    mint: "text-mint",
-    coral: "text-coral",
-    sky: "text-sky",
-    violet: "text-violet",
-  };
-  return (
-    <div className="rounded-xl border border-border bg-bg1/60 p-3 text-center backdrop-blur">
-      <div className={cn("mb-1 flex justify-center", colorMap[color])}>{icon}</div>
-      <div className={cn("font-display text-xl font-bold tabular-nums", colorMap[color])}>{value}</div>
-      <div className="text-[10px] uppercase tracking-wider text-ink-dim">{label}</div>
-    </div>
-  );
-}
-
-function AssessmentCard({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
-  return (
-    <div className="flex items-start gap-3 rounded-xl border border-border bg-bg1/40 p-4 backdrop-blur">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-bg2/40 text-ink-dim">
-        {icon}
-      </div>
-      <div>
-        <div className="text-sm font-semibold text-ink">{title}</div>
-        <p className="mt-0.5 text-xs leading-relaxed text-ink-dim">{text}</p>
-      </div>
-    </div>
+      </Box>
+    </Container>
   );
 }

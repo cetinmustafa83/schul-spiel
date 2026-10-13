@@ -5,11 +5,8 @@ import { setSoundEnabled, unlockAudio } from "@/lib/audio/sfx";
 import { LandingScreen } from "@/components/screens/landing";
 import { OnboardingScreen } from "@/components/screens/onboarding";
 import { HomeScreen } from "@/components/screens/home";
-import { GameSetupScreen } from "@/components/screens/game-setup";
-import { GameStageScreen } from "@/components/screens/game-stage";
 import { KlassenarbeitSetupScreen } from "@/components/screens/klassenarbeit-setup";
 import { KlassenarbeitRunScreen } from "@/components/screens/klassenarbeit-run";
-import { ProfileScreen } from "@/components/screens/profile";
 import { SettingsScreen } from "@/components/screens/settings";
 import { BinaryOrbits } from "@/components/ui/binary-orbits";
 import { getDB, getPlayer } from "@/lib/browser-db";
@@ -18,11 +15,8 @@ const SCREENS: Record<Screen, React.ComponentType> = {
   landing: LandingScreen,
   onboarding: OnboardingScreen,
   home: HomeScreen,
-  "game-setup": GameSetupScreen,
-  "game-stage": GameStageScreen,
   "klassenarbeit-setup": KlassenarbeitSetupScreen,
   "klassenarbeit-run": KlassenarbeitRunScreen,
-  profile: ProfileScreen,
   settings: SettingsScreen,
 };
 

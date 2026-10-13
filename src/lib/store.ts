@@ -6,11 +6,8 @@ export type Screen =
   | "landing"
   | "onboarding"
   | "home"
-  | "game-setup"
-  | "game-stage"
   | "klassenarbeit-setup"
   | "klassenarbeit-run"
-  | "profile"
   | "settings";
 
 export interface SessionPlayer {
@@ -37,10 +34,6 @@ interface AppState {
     reducedMotion: boolean;
     textScale: number;
     dyslexia: boolean;
-    highContrast: boolean;
-    largeTargets: boolean;
-    reduceTransparency: boolean;
-    focusRing: boolean;
     timer: "off" | "relaxed" | "challenge";
   };
   setPrefs: (p: Partial<AppState["prefs"]>) => void;
@@ -57,10 +50,6 @@ const DEFAULT_PREFS = {
   reducedMotion: false,
   textScale: 100,
   dyslexia: false,
-  highContrast: false,
-  largeTargets: false,
-  reduceTransparency: false,
-  focusRing: false,
   timer: "off" as const,
 };
 

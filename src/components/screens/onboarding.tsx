@@ -1,18 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Container, Box, Typography, Button, TextField, Card, IconButton,
+} from "@mui/material";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import ShuffleIcon from "@mui/icons-material/Shuffle";
+import CheckIcon from "@mui/icons-material/Check";
 import { useApp } from "@/lib/store";
-import { GooeyButton } from "@/components/ui/gooey";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ArrowLeft, ArrowRight, Shuffle } from "lucide-react";
 import { suggestSpielername, checkSpielername, SCHOOL_TYPE_LABELS } from "@/lib/german";
 import { getOrCreatePlayer } from "@/lib/browser-db";
-import { useScreenTransition } from "@/lib/animations/gsap-hooks";
+import { motionPresets } from "@/lib/theme";
 
 export function OnboardingScreen() {
   const { navigate, setPlayer, pushToast } = useApp();
-  const ref = useScreenTransition<HTMLDivElement>();
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [schoolType, setSchoolType] = useState("");
@@ -58,7 +61,6 @@ export function OnboardingScreen() {
     setError(null);
     try {
       const player = await getOrCreatePlayer(name, schoolType, grade ?? 5, null);
-      // Remember last active player
       localStorage.setItem("wissensgipfel-last-player", player.name);
       setPlayer({
         name: player.name,
@@ -76,139 +78,159 @@ export function OnboardingScreen() {
   }
 
   return (
-    <div ref={ref} className="mx-auto flex min-h-screen max-w-md flex-col px-4 py-6 sm:px-6">
-      <header className="mb-6 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={back}
-          className="tap-target inline-flex items-center gap-1.5 rounded-full border border-border bg-bg1/40 px-3 py-1.5 text-sm text-ink-dim backdrop-blur hover:text-ink"
-        >
-          <ArrowLeft className="h-4 w-4" /> Zurück
-        </button>
-        <div className="flex items-center gap-1.5">
+    <Container maxWidth="sm" sx={{ minHeight: "100vh", display: "flex", flexDirection: "column", py: 4 }}>
+      {/* Header with back + step dots */}
+      <Box component={motion.div} {...motionPresets.itemEnter(0)} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 4 }}>
+        <Button startIcon={<ArrowBackIcon />} onClick={back} sx={{ color: "text.secondary" }}>
+          Zurück
+        </Button>
+        <Box sx={{ display: "flex", gap: 0.75 }}>
           {[0, 1, 2].map((i) => (
-            <span
+            <Box
               key={i}
-              className={`h-1.5 rounded-full transition-all ${
-                i === step ? "w-6 bg-ink" : i < step ? "w-1.5 bg-ink-dim/60" : "w-1.5 bg-bg2"
-              }`}
+              sx={{
+                height: 6, borderRadius: 3,
+                transition: "all 0.3s cubic-bezier(0.22, 1, 0.36, 1)",
+                width: i === step ? 24 : 6,
+                bgcolor: i === step ? "primary.main" : i < step ? "rgba(139, 108, 255, 0.4)" : "rgba(245, 243, 255, 0.1)",
+              }}
             />
           ))}
-        </div>
-      </header>
+        </Box>
+      </Box>
 
-      <main className="flex flex-1 flex-col justify-center gap-6">
-        {step === 0 && (
-          <div className="flex flex-col gap-4">
-            <div>
-              <h1 className="font-display text-2xl font-bold tracking-tight text-ink">Wie heißt du?</h1>
-              <p className="mt-1 text-sm text-ink-dim">
-                Nimm <strong>nicht</strong> deinen echten Namen — ein Fantasienname reicht.
-              </p>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="name">Name</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="name"
+      {/* Step content */}
+      <Box sx={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 3 }}>
+        <AnimatePresence mode="wait">
+          {step === 0 && (
+            <Box key="step0" component={motion.div} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }}>
+              <Typography variant="h5" fontWeight={700} color="text.primary" gutterBottom>
+                Wie heißt du?
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                Nimm <Box component="span" fontWeight={600}>nicht</Box> deinen echten Namen — ein Fantasiename reicht.
+              </Typography>
+              <Box sx={{ display: "flex", gap: 1 }}>
+                <TextField
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="z. B. Mutiger Fuchs"
-                  maxLength={20}
-                  className="h-12 text-base"
+                  inputProps={{ maxLength: 20 }}
+                  size="medium"
+                  fullWidth
                   autoFocus
                   onKeyDown={(e) => { if (e.key === "Enter") next(); }}
                 />
-                <GooeyButton
-                  size="md"
-                  variant="soft"
-                  className="h-12 px-3"
-                  blobColor="rgba(139, 108, 255, 0.2)"
+                <IconButton
                   onClick={() => setName(suggestSpielername())}
+                  sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, px: 1.5 }}
                 >
-                  <Shuffle className="h-4 w-4" />
-                </GooeyButton>
-              </div>
-              <p className="text-xs text-ink-dim/60">3–20 Zeichen, nur Buchstaben.</p>
-            </div>
-          </div>
-        )}
+                  <ShuffleIcon />
+                </IconButton>
+              </Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1, opacity: 0.6 }}>
+                3–20 Zeichen, nur Buchstaben.
+              </Typography>
+            </Box>
+          )}
 
-        {step === 1 && (
-          <div className="flex flex-col gap-4">
-            <div>
-              <h1 className="font-display text-2xl font-bold tracking-tight text-ink">Welche Schulform?</h1>
-              <p className="mt-1 text-sm text-ink-dim">
+          {step === 1 && (
+            <Box key="step1" component={motion.div} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }}>
+              <Typography variant="h5" fontWeight={700} color="text.primary" gutterBottom>
+                Welche Schulform?
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                 Wir wählen nur Fragen aus, die zu deiner Schule passen.
-              </p>
-            </div>
-            <div className="flex flex-col gap-2">
-              {Object.entries(SCHOOL_TYPE_LABELS).map(([code, label]) => (
-                <button
-                  key={code}
-                  type="button"
-                  onClick={() => setSchoolType(code)}
-                  className={`flex items-center justify-between rounded-xl border p-4 text-left backdrop-blur transition-all ${
-                    schoolType === code
-                      ? "border-ink-dim/40 bg-bg1/70"
-                      : "border-border bg-bg1/40 hover:border-ink-dim/20 hover:bg-bg1/60"
-                  }`}
-                  style={schoolType === code ? { boxShadow: "0 0 16px rgba(106,122,154,0.15), inset 0 0 12px rgba(106,122,154,0.08)" } : undefined}
-                >
-                  <span className="font-display text-base font-semibold text-ink">{label}</span>
-                  {schoolType === code && <span className="text-ink-dim">✓</span>}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+              </Typography>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                {Object.entries(SCHOOL_TYPE_LABELS).map(([code, label], idx) => {
+                  const active = schoolType === code;
+                  return (
+                    <Box key={code} component={motion.div} {...motionPresets.itemEnter(0.03 * idx)}>
+                      <Card
+                        onClick={() => setSchoolType(code)}
+                        sx={{
+                          cursor: "pointer", p: 2,
+                          display: "flex", alignItems: "center", justifyContent: "space-between",
+                          bgcolor: active ? "rgba(139, 108, 255, 0.12)" : "background.paper",
+                          border: "1px solid",
+                          borderColor: active ? "primary.main" : "divider",
+                          boxShadow: active ? "0 0 16px rgba(139, 108, 255, 0.2)" : "none",
+                          transition: "all 0.25s",
+                          "&:hover": { borderColor: "primary.light", transform: "translateY(-1px)" },
+                        }}
+                      >
+                        <Typography variant="body1" fontWeight={600} color="text.primary">{label}</Typography>
+                        {active && <CheckIcon sx={{ color: "primary.light" }} />}
+                      </Card>
+                    </Box>
+                  );
+                })}
+              </Box>
+            </Box>
+          )}
 
-        {step === 2 && (
-          <div className="flex flex-col gap-4">
-            <div>
-              <h1 className="font-display text-2xl font-bold tracking-tight text-ink">Welche Klasse?</h1>
-              <p className="mt-1 text-sm text-ink-dim">Klassen 5–8.</p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {[5, 6, 7, 8].map((g) => (
-                <button
-                  key={g}
-                  type="button"
-                  onClick={() => setGrade(g)}
-                  className={`rounded-xl border p-6 text-center backdrop-blur transition-all ${
-                    grade === g
-                      ? "border-ink-dim/40 bg-bg1/70"
-                      : "border-border bg-bg1/40 hover:border-ink-dim/20 hover:bg-bg1/60"
-                  }`}
-                  style={grade === g ? { boxShadow: "0 0 16px rgba(106,122,154,0.15), inset 0 0 12px rgba(106,122,154,0.08)" } : undefined}
-                >
-                  <div className="font-display text-3xl font-bold text-ink">{g}</div>
-                  <div className="text-xs text-ink-dim">Klasse</div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+          {step === 2 && (
+            <Box key="step2" component={motion.div} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }}>
+              <Typography variant="h5" fontWeight={700} color="text.primary" gutterBottom>
+                Welche Klasse?
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>Klassen 5–8.</Typography>
+              <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5 }}>
+                {[5, 6, 7, 8].map((g, idx) => {
+                  const active = grade === g;
+                  return (
+                    <Box key={g} component={motion.div} {...motionPresets.cardEnter(0.05 * idx)}>
+                      <Card
+                        onClick={() => setGrade(g)}
+                        sx={{
+                          cursor: "pointer", p: 3, textAlign: "center",
+                          bgcolor: active ? "rgba(139, 108, 255, 0.12)" : "background.paper",
+                          border: "1px solid",
+                          borderColor: active ? "primary.main" : "divider",
+                          boxShadow: active ? "0 0 16px rgba(139, 108, 255, 0.2)" : "none",
+                          transition: "all 0.25s",
+                          "&:hover": { borderColor: "primary.light", transform: "translateY(-2px)" },
+                        }}
+                      >
+                        <Typography variant="h3" fontWeight={800} color={active ? "primary.light" : "text.primary"}>{g}</Typography>
+                        <Typography variant="caption" color="text.secondary">Klasse</Typography>
+                      </Card>
+                    </Box>
+                  );
+                })}
+              </Box>
+            </Box>
+          )}
+        </AnimatePresence>
 
         {error && (
-          <div className="rounded-xl border border-coral/40 bg-coral/10 px-4 py-3 text-sm text-coral">
-            {error}
-          </div>
+          <Box component={motion.div} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+            <Card sx={{ p: 1.5, bgcolor: "rgba(255, 107, 122, 0.1)", border: "1px solid", borderColor: "error.main" }}>
+              <Typography variant="body2" color="error.main">{error}</Typography>
+            </Card>
+          </Box>
         )}
-      </main>
+      </Box>
 
-      <footer className="pt-4">
-        <GooeyButton
-          size="lg"
-          className="h-14 w-full"
-          blobColor="rgba(106, 122, 154, 0.35)"
+      {/* Footer */}
+      <Box component={motion.div} {...motionPresets.itemEnter(0.1)} sx={{ pt: 3 }}>
+        <Button
+          variant="contained"
+          size="large"
+          fullWidth
+          endIcon={step === 2 ? undefined : <ArrowForwardIcon />}
           onClick={next}
           disabled={submitting}
+          sx={{
+            height: 56, borderRadius: 999,
+            fontSize: "1rem", fontWeight: 700,
+            boxShadow: "0 8px 32px rgba(139, 108, 255, 0.3)",
+          }}
         >
           {step === 2 ? (submitting ? "Wird erstellt …" : "Los geht's") : "Weiter"}
-          <ArrowRight className="ml-2 h-4 w-4" />
-        </GooeyButton>
-      </footer>
-    </div>
+        </Button>
+      </Box>
+    </Container>
   );
 }
