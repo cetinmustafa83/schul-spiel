@@ -177,17 +177,21 @@ export function KlassenarbeitRunScreen() {
       if (data.percentage >= 50) sfxCorrect(); else sfxWrong();
 
       if (player?.name) {
-        const { addGameHistory, addSeenQuestion, addToReviewDeck, upsertTopicMastery, updatePlayer } = await import("@/lib/browser-db");
+        const { addGameHistory, addSeenQuestion, addToReviewDeck, upsertTopicMastery, updatePlayer, recordDailyStats } = await import("@/lib/browser-db");
         await updatePlayer(player.name, { xp: (player.xp ?? 0) + data.correctCount * 8 });
+        const topicsToday: string[] = [];
         for (const r of data.results) {
           if (r.questionId) await addSeenQuestion(player.name, r.questionId);
           if (r.topicId != null) await upsertTopicMastery(player.name, r.topicId, r.correct);
           if (!r.correct && r.questionId) await addToReviewDeck(player.name, r.questionId);
+          if (r.topic && !topicsToday.includes(r.topic.label)) topicsToday.push(r.topic.label);
         }
         await addGameHistory({
           playerName: player.name, mode: "KLASSENARBEIT", level: 0, winnings: 0,
           correct: data.correctCount, total, date: new Date().toISOString(),
         });
+        // Record daily stats for the 5-day report.
+        await recordDailyStats(player.name, total, data.correctCount, topicsToday);
       }
     } catch {
       pushToast("Die Klassenarbeit konnte nicht ausgewertet werden.", "error");
@@ -295,7 +299,7 @@ export function KlassenarbeitRunScreen() {
       </Box>
 
       {/* Pause overlay */}
-      <Dialog open={isPaused} fullWidth maxWidth="xs" PaperProps={{ sx: { bgcolor: "background.paper", backdropFilter: "blur(20px)" } }}>
+      <Dialog open={isPaused} fullWidth maxWidth="xs" slotProps={{ paper: { sx: { bgcolor: "background.paper", backdropFilter: "blur(20px)" } } }}>
         <Box sx={{ p: 4, textAlign: "center" }}>
           <Avatar sx={{ width: 64, height: 64, mx: "auto", mb: 2, bgcolor: "rgba(92, 200, 255, 0.15)" }}>
             <PauseIcon sx={{ fontSize: 32, color: "info.main" }} />

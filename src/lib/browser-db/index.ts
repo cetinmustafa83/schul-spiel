@@ -78,6 +78,20 @@ export interface TopicMasteryDoc {
   meta?: { revision: number; created: number; version: number };
 }
 
+export interface DailyStatDoc {
+  playerName: string;
+  day: string; // YYYY-MM-DD
+  questionsAnswered: number;
+  correctCount: number;
+  wrongCount: number;
+  topicsCovered: string[]; // array of topic labels
+  createdAt: number; // epoch ms — used for 5-day cleanup
+  $loki?: number;
+  meta?: { revision: number; created: number; version: number };
+}
+
+const DAILY_REPORT_RETENTION_DAYS = 5;
+
 const DB_NAME = "wissensgipfel-db";
 
 let dbInstance: Loki | null = null;
@@ -147,6 +161,9 @@ function ensureCollections(db: Loki) {
   }
   if (!db.getCollection("topicMastery")) {
     db.addCollection("topicMastery", { unique: ["playerName", "topicId"] });
+  }
+  if (!db.getCollection("dailyStats")) {
+    db.addCollection("dailyStats", { unique: ["playerName", "day"] });
   }
 }
 
@@ -370,6 +387,78 @@ export async function exportPlayerData(name: string): Promise<Record<string, unk
     reviewDeck: db.getCollection<ReviewDeckDoc>("reviewDeck").find({ playerName: name }),
     dailyAnswers: db.getCollection<DailyAnswerDoc>("dailyAnswers").find({ playerName: name }),
     topicMastery: await getTopicMastery(name),
+    dailyStats: db.getCollection<DailyStatDoc>("dailyStats").find({ playerName: name }),
     exportedAt: new Date().toISOString(),
   };
+}
+
+// ============================================================================
+// Daily stats — track questions, topics, errors, % correct per day.
+// Max 5 days of reports, auto-cleanup after 5 days.
+// ============================================================================
+
+function todayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** Record exam results into the daily stats for today.
+ *  Merges with existing day entry if the player already practiced today. */
+export async function recordDailyStats(
+  playerName: string,
+  questionsAnswered: number,
+  correctCount: number,
+  topicsCovered: string[],
+): Promise<void> {
+  const db = await getDB();
+  const coll = db.getCollection<DailyStatDoc>("dailyStats");
+  const day = todayKey();
+  const existing = coll.findOne({ playerName, day });
+  if (existing) {
+    existing.questionsAnswered += questionsAnswered;
+    existing.correctCount += correctCount;
+    existing.wrongCount += questionsAnswered - correctCount;
+    // Merge topics (unique)
+    const topicSet = new Set([...existing.topicsCovered, ...topicsCovered]);
+    existing.topicsCovered = Array.from(topicSet);
+    coll.update(existing);
+  } else {
+    coll.insert({
+      playerName,
+      day,
+      questionsAnswered,
+      correctCount,
+      wrongCount: questionsAnswered - correctCount,
+      topicsCovered,
+      createdAt: Date.now(),
+    });
+  }
+  // Auto-cleanup old entries on every write.
+  await cleanupOldDailyStats(playerName);
+}
+
+/** Get the last N days of daily stats (default 5), newest first. */
+export async function getDailyStats(playerName: string, days = DAILY_REPORT_RETENTION_DAYS): Promise<DailyStatDoc[]> {
+  const db = await getDB();
+  await cleanupOldDailyStats(playerName);
+  const all = db.getCollection<DailyStatDoc>("dailyStats").find({ playerName });
+  // Sort by day descending
+  all.sort((a, b) => (a.day < b.day ? 1 : -1));
+  return all.slice(0, days);
+}
+
+/** Delete daily stat entries older than DAILY_REPORT_RETENTION_DAYS. */
+export async function cleanupOldDailyStats(playerName?: string): Promise<number> {
+  const db = await getDB();
+  const coll = db.getCollection<DailyStatDoc>("dailyStats");
+  const cutoff = Date.now() - DAILY_REPORT_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  const query = playerName ? { playerName } : {};
+  const all = coll.find(query);
+  let removed = 0;
+  for (const entry of all) {
+    if (entry.createdAt < cutoff) {
+      coll.remove(entry);
+      removed++;
+    }
+  }
+  return removed;
 }

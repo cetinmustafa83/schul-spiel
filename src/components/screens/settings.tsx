@@ -6,7 +6,7 @@ import {
   Container, Box, Typography, Button, Card, CardContent,
   Switch, Select, MenuItem, Slider, TextField, IconButton, Divider,
   FormControl, InputLabel, Dialog, DialogTitle, DialogContent, DialogActions,
-  Collapse, Avatar,
+  Avatar, LinearProgress, Chip, Collapse, Tooltip,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
@@ -17,10 +17,14 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import LogoutIcon from "@mui/icons-material/Logout";
 import VpnKeyIcon from "@mui/icons-material/VpnKey";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
+import AssessmentIcon from "@mui/icons-material/Assessment";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import CancelIcon from "@mui/icons-material/Cancel";
+import TopicIcon from "@mui/icons-material/Topic";
 import { useApp } from "@/lib/store";
 import { SCHOOL_TYPE_LABELS } from "@/lib/german";
-import { updatePlayer, deletePlayer, exportPlayerData } from "@/lib/browser-db";
+import { updatePlayer, deletePlayer, exportPlayerData, getDailyStats, type DailyStatDoc } from "@/lib/browser-db";
 import { motionPresets } from "@/lib/theme";
 
 const SCHOOL_TYPES = [
@@ -31,6 +35,7 @@ const SCHOOL_TYPES = [
   { code: "GY", label: "Gymnasium" },
 ];
 const GRADES = [5, 6, 7, 8];
+const ADMIN_PIN = "1234";
 
 export function SettingsScreen() {
   const { navigate, player, setPlayer, prefs, setPrefs, pushToast } = useApp();
@@ -41,6 +46,11 @@ export function SettingsScreen() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [dailyStats, setDailyStats] = useState<DailyStatDoc[]>([]);
+  const [adminUnlocked, setAdminUnlocked] = useState(false);
+  const [pinDialogOpen, setPinDialogOpen] = useState(false);
+  const [pinInput, setPinInput] = useState("");
+  const [pinError, setPinError] = useState(false);
 
   useEffect(() => {
     const key = localStorage.getItem("glm-api-key");
@@ -48,6 +58,16 @@ export function SettingsScreen() {
     if (key) setGlmApiKey(key);
     if (model) setGlmModel(model);
   }, []);
+
+  useEffect(() => {
+    if (!player?.name) return;
+    void (async () => {
+      try {
+        const stats = await getDailyStats(player.name);
+        setDailyStats(stats);
+      } catch { /* ignore */ }
+    })();
+  }, [player?.name]);
 
   function saveGlmKey() {
     localStorage.setItem("glm-api-key", glmApiKey);
@@ -113,6 +133,27 @@ export function SettingsScreen() {
     if (typeof window !== "undefined") localStorage.removeItem("wissensgipfel-last-player");
     setPlayer(null);
     navigate("landing");
+  }
+
+  function submitPin() {
+    if (pinInput === ADMIN_PIN) {
+      setAdminUnlocked(true);
+      setPinDialogOpen(false);
+      setPinInput("");
+      setPinError(false);
+      pushToast("Admin-Modus freigeschaltet.", "success");
+    } else {
+      setPinError(true);
+    }
+  }
+
+  function formatDay(day: string): string {
+    try {
+      const d = new Date(day);
+      return d.toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "short" });
+    } catch {
+      return day;
+    }
   }
 
   return (
@@ -181,62 +222,147 @@ export function SettingsScreen() {
         </Card>
       </Box>
 
-      {/* GLM AI section */}
+      {/* Daily report section */}
       <Box component={motion.div} {...motionPresets.cardEnter(0.2)} sx={{ mb: 3 }}>
         <Card sx={{ p: 3, bgcolor: "background.paper" }}>
-          <Typography variant="overline" color="text.secondary" fontWeight={600} sx={{ display: "block", mb: 1 }}>KI-Analyse (GLM)</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontSize: 12, lineHeight: 1.6 }}>
-            Optional: Verbinde ein GLM-Modell für KI-gestützte Auswertungen. Der API-Key bleibt lokal in deinem Browser.
-          </Typography>
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <Box>
-              <Typography variant="body2" fontWeight={500} color="text.primary" sx={{ mb: 0.5 }}>GLM API-Key</Typography>
-              <Box sx={{ display: "flex", gap: 1 }}>
-                <TextField
-                  type={showApiKey ? "text" : "password"}
-                  value={glmApiKey}
-                  onChange={(e) => setGlmApiKey(e.target.value)}
-                  placeholder="API-Key eingeben"
-                  size="small"
-                  fullWidth
-                  sx={{ fontFamily: "monospace" }}
-                />
-                <IconButton onClick={() => setShowApiKey((s) => !s)} size="small" sx={{ border: "1px solid", borderColor: "divider" }}>
-                  {showApiKey ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-                </IconButton>
-              </Box>
-            </Box>
-            <FormControl fullWidth size="small">
-              <InputLabel>Modell</InputLabel>
-              <Select value={glmModel} label="Modell" onChange={(e) => setGlmModel(e.target.value)}>
-                <MenuItem value="glm-4.7">GLM-4.7 (Empfohlen)</MenuItem>
-                <MenuItem value="glm-4.6">GLM-4.6</MenuItem>
-                <MenuItem value="glm-4-flash">GLM-4-Flash (Kostenlos)</MenuItem>
-                <MenuItem value="glm-4v">GLM-4V (Vision)</MenuItem>
-              </Select>
-            </FormControl>
-            <Button variant="contained" startIcon={<VpnKeyIcon />} onClick={saveGlmKey} fullWidth>
-              API-Key speichern
-            </Button>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+            <AssessmentIcon sx={{ color: "primary.light" }} />
+            <Typography variant="overline" color="text.secondary" fontWeight={600}>Tagesbericht (max. 5 Tage)</Typography>
           </Box>
+          {dailyStats.length === 0 ? (
+            <Box sx={{ textAlign: "center", py: 3 }}>
+              <Typography variant="body2" color="text.secondary">
+                Noch keine Daten. Starte eine Klassenarbeit, um deinen Fortschritt zu sehen!
+              </Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+              {dailyStats.map((stat, idx) => {
+                const pct = stat.questionsAnswered > 0 ? Math.round((stat.correctCount / stat.questionsAnswered) * 100) : 0;
+                return (
+                  <Box key={stat.day} component={motion.div} {...motionPresets.itemEnter(0.03 * idx)}>
+                    <Card sx={{ p: 2, bgcolor: "rgba(245, 243, 255, 0.03)", border: "1px solid", borderColor: "divider" }}>
+                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+                        <Typography variant="body2" fontWeight={600} color="text.primary">
+                          {formatDay(stat.day)}
+                        </Typography>
+                        <Chip
+                          label={`${pct}%`}
+                          size="small"
+                          sx={{
+                            bgcolor: pct >= 50 ? "rgba(61, 219, 164, 0.15)" : "rgba(255, 107, 122, 0.15)",
+                            color: pct >= 50 ? "success.main" : "error.main",
+                            fontWeight: 700,
+                          }}
+                        />
+                      </Box>
+                      <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1 }}>
+                        <StatItem icon={<AssessmentIcon />} label="Fragen" value={String(stat.questionsAnswered)} />
+                        <StatItem icon={<TopicIcon />} label="Themen" value={String(stat.topicsCovered.length)} />
+                        <StatItem icon={<CheckCircleIcon />} label="Richtig" value={String(stat.correctCount)} color="success.main" />
+                        <StatItem icon={<CancelIcon />} label="Falsch" value={String(stat.wrongCount)} color="error.main" />
+                      </Box>
+                      <LinearProgress
+                        variant="determinate"
+                        value={pct}
+                        sx={{
+                          mt: 1.5, height: 6, borderRadius: 3,
+                          bgcolor: "rgba(245, 243, 255, 0.08)",
+                          "& .MuiLinearProgress-bar": {
+                            bgcolor: pct >= 50 ? "success.main" : "error.main",
+                            borderRadius: 3,
+                          },
+                        }}
+                      />
+                    </Card>
+                  </Box>
+                );
+              })}
+              <Typography variant="caption" color="text.secondary" sx={{ textAlign: "center", mt: 1, opacity: 0.6 }}>
+                Berichte werden nach 5 Tagen automatisch gelöscht.
+              </Typography>
+            </Box>
+          )}
         </Card>
       </Box>
 
-      {/* Data section */}
+      {/* Admin section (PIN-protected) */}
       <Box component={motion.div} {...motionPresets.cardEnter(0.25)} sx={{ mb: 3 }}>
         <Card sx={{ p: 3, bgcolor: "background.paper" }}>
-          <Typography variant="overline" color="text.secondary" fontWeight={600} sx={{ display: "block", mb: 2 }}>Daten</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontSize: 12, lineHeight: 1.6 }}>
-            Alle deine Daten werden lokal in deinem Browser gespeichert. Du kannst sie herunterladen oder löschen.
-          </Typography>
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-            <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => void downloadData()} fullWidth>
-              Meine Daten herunterladen (JSON)
-            </Button>
-            <Button variant="outlined" color="error" startIcon={<DeleteIcon />} onClick={() => setDeleteDialogOpen(true)} fullWidth>
-              Konto löschen
-            </Button>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: adminUnlocked ? 2 : 0 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <AdminPanelSettingsIcon sx={{ color: adminUnlocked ? "primary.main" : "text.secondary" }} />
+              <Typography variant="overline" color="text.secondary" fontWeight={600}>Admin-Bereich</Typography>
+            </Box>
+            {!adminUnlocked && (
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<VpnKeyIcon />}
+                onClick={() => { setPinDialogOpen(true); setPinInput(""); setPinError(false); }}
+              >
+                PIN eingeben
+              </Button>
+            )}
           </Box>
+
+          <Collapse in={adminUnlocked}>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 3, pt: 2 }}>
+              {/* GLM AI */}
+              <Box>
+                <Typography variant="body2" fontWeight={600} color="text.primary" sx={{ mb: 1 }}>KI-Analyse (GLM)</Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1.5 }}>
+                  Optional: API-Key bleibt lokal in deinem Browser.
+                </Typography>
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                  <Box sx={{ display: "flex", gap: 1 }}>
+                    <TextField
+                      type={showApiKey ? "text" : "password"}
+                      value={glmApiKey}
+                      onChange={(e) => setGlmApiKey(e.target.value)}
+                      placeholder="API-Key eingeben"
+                      size="small"
+                      fullWidth
+                      sx={{ fontFamily: "monospace" }}
+                    />
+                    <IconButton onClick={() => setShowApiKey((s) => !s)} size="small" sx={{ border: "1px solid", borderColor: "divider" }}>
+                      {showApiKey ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                    </IconButton>
+                  </Box>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Modell</InputLabel>
+                    <Select value={glmModel} label="Modell" onChange={(e) => setGlmModel(e.target.value)}>
+                      <MenuItem value="glm-4.7">GLM-4.7 (Empfohlen)</MenuItem>
+                      <MenuItem value="glm-4.6">GLM-4.6</MenuItem>
+                      <MenuItem value="glm-4-flash">GLM-4-Flash (Kostenlos)</MenuItem>
+                      <MenuItem value="glm-4v">GLM-4V (Vision)</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <Button variant="contained" startIcon={<VpnKeyIcon />} onClick={saveGlmKey} fullWidth>
+                    API-Key speichern
+                  </Button>
+                </Box>
+              </Box>
+
+              <Divider />
+
+              {/* Data management */}
+              <Box>
+                <Typography variant="body2" fontWeight={600} color="text.primary" sx={{ mb: 1 }}>Daten</Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1.5 }}>
+                  Alle Daten werden lokal gespeichert. Du kannst sie herunterladen oder löschen.
+                </Typography>
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                  <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => void downloadData()} fullWidth>
+                    Meine Daten herunterladen (JSON)
+                  </Button>
+                  <Button variant="outlined" color="error" startIcon={<DeleteIcon />} onClick={() => setDeleteDialogOpen(true)} fullWidth>
+                    Konto löschen
+                  </Button>
+                </Box>
+              </Box>
+            </Box>
+          </Collapse>
         </Card>
       </Box>
 
@@ -249,8 +375,34 @@ export function SettingsScreen() {
         </Card>
       </Box>
 
+      {/* PIN dialog */}
+      <Dialog open={pinDialogOpen} onClose={() => setPinDialogOpen(false)} maxWidth="xs" fullWidth slotProps={{ paper: { sx: { bgcolor: "background.paper" } } }}>
+        <DialogTitle>Admin-PIN</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Bitte gib die Admin-PIN ein, um den Admin-Bereich freizuschalten.
+          </Typography>
+          <TextField
+            type="password"
+            value={pinInput}
+            onChange={(e) => { setPinInput(e.target.value); setPinError(false); }}
+            onKeyDown={(e) => { if (e.key === "Enter") submitPin(); }}
+            placeholder="PIN"
+            fullWidth
+            autoFocus
+            error={pinError}
+            helperText={pinError ? "Falsche PIN" : undefined}
+            slotProps={{ htmlInput: { maxLength: 4, inputMode: "numeric" as const } }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPinDialogOpen(false)}>Abbrechen</Button>
+          <Button variant="contained" onClick={submitPin}>Freischalten</Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Delete confirmation dialog */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} PaperProps={{ sx: { bgcolor: "background.paper" } }}>
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} slotProps={{ paper: { sx: { bgcolor: "background.paper" } } }}>
         <DialogTitle>Wirklich löschen?</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary">
@@ -296,6 +448,16 @@ function ToggleRow({
         </Box>
       </Box>
       <Switch checked={checked} onChange={(e) => onChange(e.target.checked)} />
+    </Box>
+  );
+}
+
+function StatItem({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color?: string }) {
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+      <Box sx={{ color: color ?? "text.secondary", display: "flex" }}>{icon}</Box>
+      <Typography variant="body2" fontWeight={700} sx={{ color: color ?? "text.primary" }}>{value}</Typography>
+      <Typography variant="caption" color="text.secondary">{label}</Typography>
     </Box>
   );
 }

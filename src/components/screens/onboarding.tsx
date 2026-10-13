@@ -2,22 +2,18 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Container, Box, Typography, Button, TextField, Card, IconButton,
-} from "@mui/material";
+import { Container, Box, Typography, Button, Card } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
-import ShuffleIcon from "@mui/icons-material/Shuffle";
 import CheckIcon from "@mui/icons-material/Check";
 import { useApp } from "@/lib/store";
-import { suggestSpielername, checkSpielername, SCHOOL_TYPE_LABELS } from "@/lib/german";
+import { suggestSpielername, SCHOOL_TYPE_LABELS } from "@/lib/german";
 import { getOrCreatePlayer } from "@/lib/browser-db";
 import { motionPresets } from "@/lib/theme";
 
 export function OnboardingScreen() {
   const { navigate, setPlayer, pushToast } = useApp();
   const [step, setStep] = useState(0);
-  const [name, setName] = useState("");
   const [schoolType, setSchoolType] = useState("");
   const [grade, setGrade] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -26,19 +22,12 @@ export function OnboardingScreen() {
   function next() {
     setError(null);
     if (step === 0) {
-      const check = checkSpielername(name);
-      if (!check.ok) {
-        setError(check.reason ?? "Bitte überprüfe deinen Namen.");
-        return;
-      }
-      setStep(1);
-    } else if (step === 1) {
       if (!schoolType) {
         setError("Bitte wähle deine Schulform.");
         return;
       }
-      setStep(2);
-    } else if (step === 2) {
+      setStep(1);
+    } else if (step === 1) {
       if (grade == null) {
         setError("Bitte wähle deine Klasse.");
         return;
@@ -60,6 +49,8 @@ export function OnboardingScreen() {
     setSubmitting(true);
     setError(null);
     try {
+      // Auto-generate a fantasy name — no user input needed.
+      const name = suggestSpielername();
       const player = await getOrCreatePlayer(name, schoolType, grade ?? 5, null);
       localStorage.setItem("wissensgipfel-last-player", player.name);
       setPlayer({
@@ -85,7 +76,7 @@ export function OnboardingScreen() {
           Zurück
         </Button>
         <Box sx={{ display: "flex", gap: 0.75 }}>
-          {[0, 1, 2].map((i) => (
+          {[0, 1].map((i) => (
             <Box
               key={i}
               sx={{
@@ -104,38 +95,6 @@ export function OnboardingScreen() {
         <AnimatePresence mode="wait">
           {step === 0 && (
             <Box key="step0" component={motion.div} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }}>
-              <Typography variant="h5" fontWeight={700} color="text.primary" gutterBottom>
-                Wie heißt du?
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Nimm <Box component="span" fontWeight={600}>nicht</Box> deinen echten Namen — ein Fantasiename reicht.
-              </Typography>
-              <Box sx={{ display: "flex", gap: 1 }}>
-                <TextField
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="z. B. Mutiger Fuchs"
-                  inputProps={{ maxLength: 20 }}
-                  size="medium"
-                  fullWidth
-                  autoFocus
-                  onKeyDown={(e) => { if (e.key === "Enter") next(); }}
-                />
-                <IconButton
-                  onClick={() => setName(suggestSpielername())}
-                  sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, px: 1.5 }}
-                >
-                  <ShuffleIcon />
-                </IconButton>
-              </Box>
-              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1, opacity: 0.6 }}>
-                3–20 Zeichen, nur Buchstaben.
-              </Typography>
-            </Box>
-          )}
-
-          {step === 1 && (
-            <Box key="step1" component={motion.div} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }}>
               <Typography variant="h5" fontWeight={700} color="text.primary" gutterBottom>
                 Welche Schulform?
               </Typography>
@@ -170,8 +129,8 @@ export function OnboardingScreen() {
             </Box>
           )}
 
-          {step === 2 && (
-            <Box key="step2" component={motion.div} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }}>
+          {step === 1 && (
+            <Box key="step1" component={motion.div} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }}>
               <Typography variant="h5" fontWeight={700} color="text.primary" gutterBottom>
                 Welche Klasse?
               </Typography>
@@ -219,7 +178,7 @@ export function OnboardingScreen() {
           variant="contained"
           size="large"
           fullWidth
-          endIcon={step === 2 ? undefined : <ArrowForwardIcon />}
+          endIcon={step === 1 ? undefined : <ArrowForwardIcon />}
           onClick={next}
           disabled={submitting}
           sx={{
@@ -228,7 +187,7 @@ export function OnboardingScreen() {
             boxShadow: "0 8px 32px rgba(139, 108, 255, 0.3)",
           }}
         >
-          {step === 2 ? (submitting ? "Wird erstellt …" : "Los geht's") : "Weiter"}
+          {step === 1 ? (submitting ? "Wird erstellt …" : "Los geht's") : "Weiter"}
         </Button>
       </Box>
     </Container>
