@@ -8,18 +8,10 @@ export type Screen =
   | "home"
   | "game-setup"
   | "game-stage"
-  | "training-setup"
-  | "training-run"
   | "klassenarbeit-setup"
   | "klassenarbeit-run"
-  | "review"
-  | "daily"
   | "profile"
-  | "settings"
-  | "legal"
-  | "parent-info"
-  | "help"
-  | "imprint";
+  | "settings";
 
 export interface SessionPlayer {
   name: string;
@@ -30,29 +22,29 @@ export interface SessionPlayer {
 }
 
 interface AppState {
-  // Session — stored in LokiJS (browser localStorage)
   player: SessionPlayer | null;
   loadingPlayer: boolean;
   setPlayer: (p: SessionPlayer | null) => void;
   setLoadingPlayer: (b: boolean) => void;
 
-  // Navigation
   screen: Screen;
   navigate: (s: Screen) => void;
   payload: Record<string, unknown> | null;
   setPayload: (p: Record<string, unknown> | null) => void;
 
-  // Player prefs — stored in localStorage
   prefs: {
     sound: boolean;
     reducedMotion: boolean;
     textScale: number;
     dyslexia: boolean;
+    highContrast: boolean;
+    largeTargets: boolean;
+    reduceTransparency: boolean;
+    focusRing: boolean;
     timer: "off" | "relaxed" | "challenge";
   };
   setPrefs: (p: Partial<AppState["prefs"]>) => void;
 
-  // Toasts
   toasts: Array<{ id: string; message: string; tone: "default" | "success" | "error" | "info" }>;
   pushToast: (message: string, tone?: "default" | "success" | "error" | "info") => void;
   dismissToast: (id: string) => void;
@@ -60,17 +52,27 @@ interface AppState {
 
 const PREFS_KEY = "wissensgipfel-prefs";
 
+const DEFAULT_PREFS = {
+  sound: true,
+  reducedMotion: false,
+  textScale: 100,
+  dyslexia: false,
+  highContrast: false,
+  largeTargets: false,
+  reduceTransparency: false,
+  focusRing: false,
+  timer: "off" as const,
+};
+
 function loadPrefs(): AppState["prefs"] {
-  if (typeof window === "undefined") {
-    return { sound: true, reducedMotion: false, textScale: 100, dyslexia: false, timer: "off" };
-  }
+  if (typeof window === "undefined") return { ...DEFAULT_PREFS };
   try {
     const stored = localStorage.getItem(PREFS_KEY);
-    if (stored) return { ...{ sound: true, reducedMotion: false, textScale: 100, dyslexia: false, timer: "off" }, ...JSON.parse(stored) };
+    if (stored) return { ...DEFAULT_PREFS, ...JSON.parse(stored) };
   } catch {
-    // ignore
+    /* ignore */
   }
-  return { sound: true, reducedMotion: false, textScale: 100, dyslexia: false, timer: "off" };
+  return { ...DEFAULT_PREFS };
 }
 
 export const useApp = create<AppState>((set, get) => ({
@@ -82,24 +84,16 @@ export const useApp = create<AppState>((set, get) => ({
   screen: "landing",
   navigate: (s) => {
     set({ screen: s });
-    if (typeof window !== "undefined") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   },
   payload: null,
   setPayload: (p) => set({ payload: p }),
 
   prefs: loadPrefs(),
   setPrefs: (p) => {
-    const newPrefs = { ...get().prefs, ...p };
-    set({ prefs: newPrefs });
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem(PREFS_KEY, JSON.stringify(newPrefs));
-      } catch {
-        // ignore
-      }
-    }
+    const np = { ...get().prefs, ...p };
+    set({ prefs: np });
+    if (typeof window !== "undefined") try { localStorage.setItem(PREFS_KEY, JSON.stringify(np)); } catch { /* ignore */ }
   },
 
   toasts: [],

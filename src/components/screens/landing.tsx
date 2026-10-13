@@ -1,10 +1,9 @@
 "use client";
 
 import { useApp } from "@/lib/store";
-import { GooeyButton, MetaBlobs } from "@/components/ui/gooey";
+import { GooeyButton } from "@/components/ui/gooey";
 import { formatTaler } from "@/lib/german";
 import { useScreenTransition } from "@/lib/animations/gsap-hooks";
-import { MountainScene3D } from "@/components/three/mountain-scene";
 import { useEffect, useRef } from "react";
 import { gsap } from "gsap";
 
@@ -16,7 +15,7 @@ export function LandingScreen() {
   useEffect(() => {
     if (prefs.reducedMotion || !titleRef.current) return;
     const tl = gsap.to(titleRef.current, {
-      textShadow: "0 0 24px rgba(74, 85, 104, 0.4)",
+      textShadow: "0 0 28px rgba(139, 108, 255, 0.55)",
       duration: 3,
       repeat: -1,
       yoyo: true,
@@ -27,17 +26,6 @@ export function LandingScreen() {
 
   return (
     <div ref={ref} className="relative mx-auto flex min-h-screen max-w-3xl flex-col px-4 py-8 sm:px-6">
-      <MountainScene3D
-        className="pointer-events-none fixed inset-0 z-0 opacity-90"
-        reducedMotion={prefs.reducedMotion}
-      />
-      <MetaBlobs
-        className="fixed inset-0 z-0"
-        count={4}
-        colors={["rgba(106, 122, 154, 0.12)", "rgba(139, 108, 255, 0.06)", "rgba(92, 200, 255, 0.04)"]}
-        maxSize={180}
-        reducedMotion={prefs.reducedMotion}
-      />
       <header className="relative z-10 flex flex-1 flex-col items-center justify-center text-center">
         <div className="mb-8 flex flex-col items-center gap-4">
           <div>
@@ -60,7 +48,7 @@ export function LandingScreen() {
           <GooeyButton
             size="lg"
             className="w-full h-14"
-            blobColor="rgba(106, 122, 154, 0.4)"
+            blobColor="rgba(139, 108, 255, 0.45)"
             onClick={() => navigate("onboarding")}
           >
             Los geht&apos;s

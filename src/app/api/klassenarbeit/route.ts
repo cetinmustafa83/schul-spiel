@@ -12,6 +12,7 @@ const startSchema = z.object({
   schoolType: z.string().min(2).max(4),
   grade: z.number().int().min(5).max(8),
   subjectCode: z.string().min(2).max(4),
+  topicFilter: z.array(z.string()).optional(),
   length: z.number().int().min(10).max(50).default(20),
 });
 
@@ -20,18 +21,22 @@ export async function POST(req: Request): Promise<NextResponse> {
     const body = await req.json().catch(() => ({}));
     const parsed = startSchema.safeParse(body);
     if (!parsed.success) return errorResponse("VALIDATION", 400, parsed.error.issues[0]?.message ?? "Eingabe ungültig.");
-    const { playerName, schoolType, grade, subjectCode, length } = parsed.data;
+    const { playerName, schoolType, grade, subjectCode, topicFilter, length } = parsed.data;
 
     const track = trackOfSchoolType(schoolType);
     const column = introGradeColumn(track);
 
-    // Build eligible pool — subject + grade filtered
+    // Build eligible pool — subject + grade filtered, optional topic filter
+    const where: Record<string, unknown> = {
+      status: "published",
+      subject: { code: subjectCode },
+      AND: [{ [column]: { not: null } }],
+    };
+    if (topicFilter && topicFilter.length > 0) {
+      where.topic = { code: { in: topicFilter } };
+    }
     const rows = await db.question.findMany({
-      where: {
-        status: "published",
-        subject: { code: subjectCode },
-        AND: [{ [column]: { not: null } }],
-      },
+      where: where as never,
       select: {
         id: true,
         [column]: true,

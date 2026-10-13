@@ -3,16 +3,22 @@
 import { useEffect, useState } from "react";
 import { useApp } from "@/lib/store";
 import { GooeyButton } from "@/components/ui/gooey";
-import { ArrowLeft, FileText, ChevronRight } from "lucide-react";
+import { ArrowLeft, FileText, ChevronRight, Check } from "lucide-react";
 import { useScreenTransition } from "@/lib/animations/gsap-hooks";
 import { cn } from "@/lib/utils";
 
+interface Topic {
+  id: number;
+  code: string;
+  label: string;
+}
 interface Subject {
   id: number;
   code: string;
   label: string;
   icon: string | null;
   color: string | null;
+  topics: Topic[];
 }
 
 const EXAM_LENGTHS = [20, 30, 45] as const;
@@ -22,6 +28,7 @@ export function KlassenarbeitSetupScreen() {
   const ref = useScreenTransition<HTMLDivElement>();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+  const [selectedTopics, setSelectedTopics] = useState<Set<string>>(new Set());
   const [length, setLength] = useState<number>(20);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -40,6 +47,26 @@ export function KlassenarbeitSetupScreen() {
     })();
   }, [pushToast]);
 
+  function toggleSubject(code: string) {
+    setSelectedSubject((prev) => {
+      const next = code === prev ? null : code;
+      // Reset topic selection when subject changes
+      setSelectedTopics(new Set());
+      return next;
+    });
+  }
+
+  function toggleTopic(code: string) {
+    setSelectedTopics((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code);
+      else next.add(code);
+      return next;
+    });
+  }
+
+  const activeSubject = subjects.find((s) => s.code === selectedSubject);
+
   async function startExam() {
     if (!selectedSubject) {
       pushToast("Bitte wähle ein Fach.", "error");
@@ -55,6 +82,7 @@ export function KlassenarbeitSetupScreen() {
           schoolType: player?.schoolType,
           grade: player?.grade,
           subjectCode: selectedSubject,
+          topicFilter: selectedTopics.size > 0 ? Array.from(selectedTopics) : undefined,
           length,
         }),
       });
@@ -120,7 +148,7 @@ export function KlassenarbeitSetupScreen() {
                 <button
                   key={s.id}
                   type="button"
-                  onClick={() => setSelectedSubject(s.code)}
+                  onClick={() => toggleSubject(s.code)}
                   className={cn(
                     "flex flex-col items-center gap-2 rounded-xl border p-4 backdrop-blur transition-all",
                     selectedSubject === s.code
@@ -136,6 +164,39 @@ export function KlassenarbeitSetupScreen() {
             </div>
           )}
         </section>
+
+        {/* Topic selection (optional) */}
+        {activeSubject && activeSubject.topics.length > 0 && (
+          <section>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="font-display text-xs font-semibold uppercase tracking-wider text-ink-dim">
+                Themen
+              </h2>
+              <span className="text-xs text-ink-dim">(optional — leer = alle)</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {activeSubject.topics.map((t) => {
+                const active = selectedTopics.has(t.code);
+                return (
+                  <button
+                    key={t.code}
+                    type="button"
+                    onClick={() => toggleTopic(t.code)}
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs transition-all",
+                      active
+                        ? "border-ink-dim/40 bg-bg1/70 text-ink"
+                        : "border-border bg-bg1/40 text-ink-dim hover:border-ink-dim/20 hover:text-ink"
+                    )}
+                  >
+                    {active && <Check className="h-3 w-3" />}
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {/* Exam length */}
         <section>
@@ -189,6 +250,7 @@ export function KlassenarbeitSetupScreen() {
             <div className="text-[10px] uppercase tracking-wider text-ink-dim">Prüfung</div>
             <div className="font-display text-sm font-semibold text-ink">
               {length} Fragen · {selectedSubject ? subjects.find((s) => s.code === selectedSubject)?.label : "Fach wählen"}
+              {selectedTopics.size > 0 && ` · ${selectedTopics.size} Themen`}
             </div>
           </div>
           <GooeyButton
